@@ -1,0 +1,15 @@
+TARGETNAME=GuardLite
+TARGETTYPE=DRIVER
+TARGETPATH=..\out\
+
+TARGETLIBS=
+
+
+INCLUDES=$(BASEDIR)\inc;\
+         $(BASEDIR)\inc\ddk;\
+
+SOURCES=GuardLite.c\
+		Regmon.c\
+		Filemon.c\
+		Servicesmon.c\
+		Public.c\
