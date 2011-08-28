@@ -33,29 +33,27 @@ typedef struct _IRP_LIST{
 }IRP_LIST, *PIRP_LIST;
 
 // 检测到一个包的数据申名
-typedef struct _GuardLiteQuery{
-	GUARDLITEPACK			Pack;
-	KEVENT					Event;
-	ULONG					Timeout;
-	ULONG					ulID;
-}GUARDLITEQUERY, *PGUARDLITEQUERY;
+typedef struct _GuardLiteInnerPack{
+	GUARDLITEPACK			Pack;		// 外部的数据结构
+	KEVENT					Event;		// 待事件
+	BOOLEAN					Timeout;	// 是否超时
+	BOOLEAN					Read;		// 是否被读取
+	BOOLEAN					Access;		// 是否被通过
+}GUARDLITEINNERPACK, *PGUARDLITEINNERPACK;
 
 // PACK队列
-typedef struct _PACK_LIST{
-	GUARDLITEQUERY		query;
-	LIST_ENTRY			list;
-}PACK_LIST, *PPACK_LIST;
+typedef struct _InnerPackList{
+	GUARDLITEINNERPACK		innerPack;
+	LIST_ENTRY				list;
+}INNERPACK_LIST, *PINNERPACK_LIST;
 
 // Pack的Lookaside结构
 typedef struct _PACK_QUEUE{
 	LIST_ENTRY					list;
+	ULONG						ulWaitID;
+	KMUTEX						mutex;
 	PNPAGED_LOOKASIDE_LIST		lookaside;
 } PACK_QUEUE;
-// IRP队列
-typedef struct _IRP_QUEUE{
-	IRP_LIST					list;
-	PNPAGED_LOOKASIDE_LIST		lookaside;	
-} IRP_QUEUE;
 
 // 设备扩展定义
 typedef struct _DEVICE_EXTENSION
@@ -69,13 +67,16 @@ typedef struct _DEVICE_EXTENSION
 
 }DEVICE_EXTENSION, *PDEVICE_EXTENSION;
 
+// IRP读取栈
+typedef struct _IRP_Read_Stack{
+	PIRP			irp[8];
+	LONG			lPos;			// 当前指针
+	KSPIN_LOCK		spinkLock;		// 自旋锁
+}IRP_READ_STACK;
 //////////////////////////////////////////////////////////////////////////
 // 全局变量
 extern PACK_QUEUE			gPackQueue;
-extern LIST_ENTRY			gPackWaitList;
-extern IRP_QUEUE			gIrpQueue;
-extern KMUTEX				gIrpPackMutex;
-extern ULONG				gPackWaitID;
+extern IRP_READ_STACK		gIrpReadStack;
 //////////////////////////////////////////////////////////////////////////
 // 主驱动模块函数
 NTSTATUS	DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath);
@@ -115,6 +116,10 @@ NTSTATUS	ProcmonDispatchRoutine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
 
 //////////////////////////////////////////////////////////////////////////
 // 公共函数
-NTSTATUS		AddIrpToQueue(PIRP pIrp);
-NTSTATUS		AddPackToQueue(PGUARDLITEQUERY pQuery);
-NTSTATUS		DealIrpAndPackQueue();
+NTSTATUS				AddIrpToQueue(PIRP pIrp);
+PINNERPACK_LIST			AddPackToQueue(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath);
+void					RemovePackToQueue(PINNERPACK_LIST pQuery);
+void					SetPackForQuery(ULONG nWaitID, BOOLEAN Access);
+NTSTATUS				DealIrpAndPackQueue();
+LONG					IrpReadStackPush(PIRP pIrp);
+PIRP					IrpReadStackPop();
