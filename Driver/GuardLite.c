@@ -6,13 +6,7 @@
 #pragma LOCKEDDATA
 PACK_QUEUE		gPackQueue;
 #pragma LOCKEDDATA
-LIST_ENTRY		gPackWaitList;
-#pragma LOCKEDDATA
-IRP_QUEUE		gIrpQueue;
-#pragma LOCKEDDATA
-KMUTEX			gIrpPackMutex;
-#pragma LOCKEDDATA
-ULONG			gPackWaitID;
+IRP_READ_STACK	gIrpReadStack;
 
 // 驱动主函数
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath)
@@ -57,17 +51,15 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	pDevExt->DeviceType = GLDT_Main;
 	RtlCopyUnicodeString(&pDevExt->LinkName, &usLinkName);
 	pDevExt->StartMask = 0L;
-	// 初始化IRP链表
-	InitializeListHead(&gIrpQueue.list);
-	ExInitializeNPagedLookasideList(&gIrpQueue.lookaside, NULL, NULL, 0, sizeof(IRP_LIST), PAGE_DEBUG, 0);
 	// 初始化PACK链表
 	InitializeListHead(&gPackQueue.list);
-	ExInitializeNPagedLookasideList(&gPackQueue.lookaside, NULL, NULL, 0, sizeof(PACK_LIST), PAGE_DEBUG, 0);
-	// 等待队列
-	InitializeListHead(&gPackWaitList);
-	gPackWaitID = 0L;
-	// 初始化互斥量
-	KeInitializeMutex(&gIrpPackMutex, 0);
+	ExInitializeNPagedLookasideList(&gPackQueue.lookaside, NULL, NULL, 0, sizeof(INNERPACK_LIST), PAGE_DEBUG, 0);
+	gPackQueue.ulWaitID = 0L;
+	KeInitializeMutex(&gPackQueue.mutex, 0);
+	// 初始化IRP栈变量
+	RtlZeroMemory(&gIrpReadStack, sizeof(gIrpReadStack));
+	gIrpReadStack.lPos = -1L;
+	KeInitializeSpinLock(&gIrpReadStack.spinkLock);
 
 	return status;
 }

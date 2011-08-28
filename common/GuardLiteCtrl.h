@@ -34,10 +34,11 @@
 
 #pragma pack(push, 1)
 typedef struct _GuardLitePack{
-	ULONG		dwMonType;
-	ULONG		dwProcessID;
-	WCHAR		szPath[256];
-	WCHAR		szSubPath[512];
+	ULONG		dwMonType;			// 监控类型
+	ULONG		dwPackID;			// 此次监控的ID标识
+	ULONG		dwProcessID;		// 目标进程ID
+	WCHAR		szPath[256];		// 监控目录
+	WCHAR		szSubPath[512];		// 监控子目录
 }GUARDLITEPACK;
 #pragma pack(pop)
 
