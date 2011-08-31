@@ -14,16 +14,22 @@ PSRVTABLE					ServiceTable			= NULL;
 
 
 GUARDPATH		RegGuardPath[]		= {
-	{L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", L"", 0}
-	, {L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", L"", 0}
-	, {L"HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows", L"load", 0}
-	, {L"HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", L"Userinit", 0}
-	, {L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce", L"", 0}
-	, {L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce", L"", 0}
-	, {L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices", L"", 0}
-	, {L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices", L"", 0}
-	, {L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup", L"", 0}
-	, {L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup", L"", 0}
+	{MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows", L"load", 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", L"Userinit", 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RUNSERVICESONCE", NULL, 0}
+	, {MASK_SYSTEM_SCREEN, L"HKCU\\Control Panel\\Desktop", L"Scrnsave.exe", 0}
 };
 
 ROOTKEY CurrentUser[] = {
@@ -55,7 +61,7 @@ NTSTATUS	RegmonEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	for(i = 0; i < arrayof(RootKey); i++)
 		RootKey[i].RootNameLen = wcslen(RootKey[i].RootName);
 	for(i = 0; i < arrayof(RegGuardPath); i++)
-		RegGuardPath[i].ulPathHash = GetHashUprPath(RegGuardPath[i].szGuardPath);
+		RegGuardPath[i].ulPathHash = GetHashUprPath(RegGuardPath[i].pGuardPath);
 	// 初始化内存分配器
 	ExInitializePagedLookasideList(&gRegMonLooaside, NULL, NULL, 0
 		, MAXPATHLEN * 2 + 2 * sizeof(ULONG), PAGE_DEBUG, 0);
@@ -156,7 +162,7 @@ void ConvertKeyPath(LPWSTR pOut, LPWSTR pIn, int nLen)
 /*
  *	查看路径是否监控的路径
  */
-BOOLEAN		IsRegGuardPath(PCWSTR pPath, PCWSTR pSubPath)
+BOOLEAN		IsRegGuardPath(PCWSTR pPath, PCWSTR pSubPath, LONG* pSubType)
 {
 	ULONG			ulHash			= GetHashUprPath(pPath);
 	int				i;
@@ -167,9 +173,10 @@ BOOLEAN		IsRegGuardPath(PCWSTR pPath, PCWSTR pSubPath)
 			continue;
 		/*if(_wcsicmp(pPath, RegGuardPath[i].szGuardPath) == 0)*/
 
-		if(0 == RegGuardPath[i].szSubPath[0])
+		*pSubType = RegGuardPath[i].nSubType;
+		if(NULL == RegGuardPath[i].pSubPath)
 			return TRUE;
-		if(0 == _wcsicmp(pSubPath, RegGuardPath[i].szSubPath))
+		if(0 == _wcsicmp(pSubPath, RegGuardPath[i].pSubPath))
 			return TRUE;
 		
 		return FALSE;
@@ -181,20 +188,21 @@ NTSTATUS RegSetValueKey( IN HANDLE KeyHandle, IN PUNICODE_STRING ValueName,
 						IN ULONG TitleIndex, IN ULONG Type, 
 						IN PVOID Data, IN ULONG DataSize )
 {
-	CHAR			szMod[512]				= {0};
 	WCHAR			szFullPath[MAXPATHLEN]	= {0};		
 	PVOID			pKeyObj					= NULL;
 	ULONG			ulRet					= 0;
 	PUNICODE_STRING	fullUniName				= NULL;
 	int				i;
 	ULONG			nAllowd					= 1;
-	WCHAR			szValueName[128]		= {0};
+	WCHAR			szValueName[256]		= {0};
+	WCHAR			szValue[512]			= {0};
 
 	if(FALSE == IsGuardStart())
 		goto allowed;
 	if(STATUS_SUCCESS == ObReferenceObjectByHandle(KeyHandle, 0, NULL, KernelMode, &pKeyObj, NULL))
  	{
 		PINNERPACK_LIST			pList;
+		LONG					nSubType		= 0;
 
  		fullUniName = ExAllocateFromPagedLookasideList(&gRegMonLooaside);
 		if(NULL == fullUniName)
@@ -210,11 +218,18 @@ NTSTATUS RegSetValueKey( IN HANDLE KeyHandle, IN PUNICODE_STRING ValueName,
 		wcsncpy(szValueName, (NULL != ValueName)?ValueName->Buffer:L""
 			, (NULL != ValueName)?ValueName->Length:0);
 		// 比较路径
-		if(FALSE == IsRegGuardPath(szFullPath, szValueName))
+		if(FALSE == IsRegGuardPath(szFullPath, szValueName, &nSubType))
 			goto allowed;
+		if(REG_SZ == Type)
+		{
+			wcsncpy(szValue, Data, arrayof(szValueName));
+		}
 		// 到用户求请
-		if(FALSE != CheckRequestIsAllowed(MASK_GUARDLITE_REGMON, szFullPath, szValueName))
+		if(FALSE != CheckRequestIsAllowed(MAKEGUARDTYPE(MASK_GUARDLITE_REGMON, nSubType)
+			, szFullPath, szValueName, szValue))
+		{
 			goto allowed;
+		}
 	}
 	return STATUS_ACCESS_DENIED;
 allowed:

@@ -180,8 +180,6 @@ void DriverUnload(PDRIVER_OBJECT pDriverObject)
 	RegmonUnload();
 	ServicesUnload();
 	ProcmonUnload();
-	// 完成未处理IRP
-	CancelReadIrp();
 	// 删除设备
 	pNextDev = pDriverObject->DeviceObject;
 	while(NULL != pNextDev)

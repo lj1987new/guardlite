@@ -15,7 +15,7 @@ typedef struct _SRVTABLE {
 typedef struct _rootkey {
 	WCHAR                RootName[256];
 	WCHAR                RootShort[32];
-	ULONG               RootNameLen;
+	ULONG				RootNameLen;
 } ROOTKEY, *PROOTKEY;
 
 // DDK ≤ªƒ‹”√C++
