@@ -33,14 +33,17 @@ NTSTATUS		AddIrpToQueue(PIRP pIrp)
 	return pIrp->IoStatus.Status;
 }
 // 添加PACK队列
-PINNERPACK_LIST		AddPackToQueue(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath)
+BOOLEAN		CheckRequestIsAllowed(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath)
 {
-	PINNERPACK_LIST			pList	= NULL;
+	PINNERPACK_LIST			pList			= NULL;
+	LARGE_INTEGER			timeout;
+	NTSTATUS				status;
+	BOOLEAN					bRet			= FALSE;
 
 	// 分配内存空间
 	pList = ExAllocateFromNPagedLookasideList(&gPackQueue.lookaside);
 	if(NULL == pList)
-		return NULL;
+		return TRUE;
 	RtlZeroMemory(&pList->innerPack, sizeof(GUARDLITEINNERPACK));
 	pList->innerPack.Read = FALSE;
 	pList->innerPack.Timeout = FALSE;
@@ -57,8 +60,14 @@ PINNERPACK_LIST		AddPackToQueue(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath)
 	KeReleaseMutex(&gPackQueue.mutex, FALSE);
 	// 处理队列
 	DealIrpAndPackQueue();
+	// 等待事件
+	timeout = RtlConvertLongToLargeInteger(-60 * 1000 * 10000);
+	KeWaitForSingleObject(&pList->innerPack.Event, Executive, KernelMode, FALSE, &timeout);
+	bRet = (BOOLEAN)pList->innerPack.Access;
+	// 删除空间
+	EraseFromQueue(pList);
 
-	return pList;
+	return bRet;
 }
 // 处理队列
 NTSTATUS		DealIrpAndPackQueue()
@@ -112,7 +121,7 @@ NTSTATUS	ResponseToQueue(PIRP pIrp)
 	return pIrp->IoStatus.Status;
 }
 // 删除Pack
-void		RemovePackToQueue(PINNERPACK_LIST pQuery)
+void		EraseFromQueue(PINNERPACK_LIST pQuery)
 {
 	PINNERPACK_LIST			pPackList		= NULL;
 	PLIST_ENTRY				pCurList		= gPackQueue.list.Flink;
