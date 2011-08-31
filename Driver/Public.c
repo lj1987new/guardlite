@@ -169,7 +169,7 @@ LONG		IrpReadStackPush(PIRP pIrp)
 	LONG			lRet		= -1L;
 
 	KeAcquireSpinLock(&gIrpReadStack.spinkLock, &irql);
-	if(gIrpReadStack.lPos < (sizeof(gIrpReadStack.irp) - 1))
+	if(gIrpReadStack.lPos < (LONG)(arrayof(gIrpReadStack.irp) - 1))
 	{
 		gIrpReadStack.irp[++gIrpReadStack.lPos] = pIrp;
 		lRet = gIrpReadStack.lPos;
@@ -185,7 +185,7 @@ PIRP		IrpReadStackPop()
 	PIRP			pIrp		= NULL;
 
 	KeAcquireSpinLock(&gIrpReadStack.spinkLock, &irql);
-	if(gIrpReadStack.lPos > -1)
+	if(gIrpReadStack.lPos > -1L)
 	{
 		pIrp = gIrpReadStack.irp[gIrpReadStack.lPos--];
 	}
