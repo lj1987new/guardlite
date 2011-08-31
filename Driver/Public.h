@@ -8,8 +8,8 @@ typedef struct _guardpath {
 // ¹«¹²º¯Êý
 NTSTATUS				AddIrpToQueue(PIRP pIrp);
 NTSTATUS				ResponseToQueue(PIRP pIrp);
-PINNERPACK_LIST			AddPackToQueue(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath);
-void					RemovePackToQueue(PINNERPACK_LIST pQuery);
+BOOLEAN					CheckRequestIsAllowed(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath);
+void					EraseFromQueue(PINNERPACK_LIST pQuery);
 void					SetPackForQuery(ULONG nWaitID, BOOLEAN Access);
 NTSTATUS				DealIrpAndPackQueue();
 LONG					IrpReadStackPush(PIRP pIrp);

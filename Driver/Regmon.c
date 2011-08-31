@@ -198,11 +198,8 @@ NTSTATUS RegSetValueKey( IN HANDLE KeyHandle, IN PUNICODE_STRING ValueName,
 		// 到用户求请
 		wcsncpy(szValueName, (NULL != ValueName)?ValueName->Buffer:L""
 			, (NULL != ValueName)?ValueName->Length:0);
-		pList = AddPackToQueue(MASK_GUARDLITE_REGMON, szFullPath, szValueName);
 
-		if(NULL == pList)
-			goto allowed;
-		if(FALSE != pList->innerPack.Access)
+		if(FALSE != CheckRequestIsAllowed(MASK_GUARDLITE_REGMON, szFullPath, szValueName))
 			goto allowed;
 	}
 	return STATUS_ACCESS_DENIED;

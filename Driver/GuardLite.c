@@ -11,6 +11,8 @@ PACK_QUEUE		gPackQueue;
 IRP_READ_STACK	gIrpReadStack;
 #pragma LOCKEDDATA
 LONG			gGuardStatus;
+#pragma LOCKEDDATA
+PEPROCESS		gOptProcess;
 
 // Çý¶¯Ö÷º¯Êý
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath)
@@ -58,6 +60,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	pDevExt->StartMask = 0L;
 	// ×¢²á¼à¿Øº¯Êý
 	gGuardStatus = 0L;
+	gOptProcess = NULL;
 	if(STATUS_SUCCESS != FilemonEntry(pDriverObject, pRegistryPath))
 		goto failed;
 	if(STATUS_SUCCESS != RegmonEntry(pDriverObject, pRegistryPath))
@@ -112,6 +115,8 @@ NTSTATUS DriverCloseRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp)
 {
 	PIRP			pReadIrp;
 
+	gGuardStatus = 0L;
+	gOptProcess = NULL;
 	do 
 	{
 		pReadIrp = IrpReadStackPop();
@@ -140,10 +145,12 @@ NTSTATUS DriverDeviceControlRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp)
 	switch(pStack->Parameters.DeviceIoControl.IoControlCode)
 	{
 	case GUARDLITE_CTRL_START:
+		gOptProcess = PsGetCurrentProcess();
 		gGuardStatus = 1L;
 		break;
 	case GUARDLITE_CTRL_STOP:
 		gGuardStatus = 0L;
+		gOptProcess = NULL;
 		break;
 	case GUARDLITE_CTRL_STATUS:
 		{
@@ -172,7 +179,7 @@ NTSTATUS DriverDeviceControlRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp)
 // ¼à¿ØÊÇ·ñ¿ªÆô
 BOOLEAN IsGuardStart()
 {
-	return FALSE != gGuardStatus;
+	return FALSE != gGuardStatus && gOptProcess != PsGetCurrentProcess();
 }
 
 // ÓùÔØÇý¶¯
