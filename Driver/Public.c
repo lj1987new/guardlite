@@ -4,11 +4,22 @@
 #include "GuardLite.h"
 #include "Public.h"
 
+#define REQUEST_TIME_OUT			30		// 请求超时时间
+
 // 添加IRP队列
 NTSTATUS		AddIrpToQueue(PIRP pIrp)
 {
 	PIO_STACK_LOCATION		pStack			= NULL;
 
+	// 是否已经停止监控
+	if(0 == gGuardStatus)
+	{
+		pIrp->IoStatus.Information = 0;
+		pIrp->IoStatus.Status = STATUS_CANCELLED;
+		IoCompleteRequest(pIrp, IO_NO_INCREMENT);
+		return pIrp->IoStatus.Status;
+	}
+	// 验证接收缓冲区
 	pStack = IoGetCurrentIrpStackLocation(pIrp);
 	if(pStack->Parameters.DeviceIoControl.OutputBufferLength < (LONG)sizeof(GUARDLITEREQUEST))
 	{
@@ -33,7 +44,7 @@ NTSTATUS		AddIrpToQueue(PIRP pIrp)
 	return pIrp->IoStatus.Status;
 }
 // 添加PACK队列
-BOOLEAN		CheckRequestIsAllowed(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath)
+BOOLEAN		CheckRequestIsAllowed(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath, LPCWSTR lpValue)
 {
 	PINNERPACK_LIST			pList			= NULL;
 	LARGE_INTEGER			timeout;
@@ -51,9 +62,10 @@ BOOLEAN		CheckRequestIsAllowed(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath)
 	KeInitializeEvent(&pList->innerPack.Event, NotificationEvent, FALSE);
 	pList->innerPack.Pack.dwRequestID = InterlockedDecrement(&gPackQueue.ulWaitID);
 	pList->innerPack.Pack.dwProcessID = (ULONG)PsGetCurrentProcessId();
-	pList->innerPack.Pack.dwMonType = ulType;
+	pList->innerPack.Pack.dwGuardType = ulType;
 	wcsncpy(pList->innerPack.Pack.szPath, lpPath, arrayof(pList->innerPack.Pack.szPath));
 	wcsncpy(pList->innerPack.Pack.szSubPath, lpSubPath, arrayof(pList->innerPack.Pack.szSubPath));
+	wcsncpy(pList->innerPack.Pack.szValue, lpValue, arrayof(pList->innerPack.Pack.szValue));
 	// 插入队列
 	KeWaitForSingleObject(&gPackQueue.mutex, Executive, KernelMode, FALSE, NULL);
 	InsertTailList(&gPackQueue.list, &pList->list);
@@ -61,7 +73,7 @@ BOOLEAN		CheckRequestIsAllowed(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath)
 	// 处理队列
 	DealIrpAndPackQueue();
 	// 等待事件
-	timeout = RtlConvertLongToLargeInteger(-60 * 1000 * 10000);
+	timeout = RtlConvertLongToLargeInteger(-REQUEST_TIME_OUT * 1000 * 10000);
 	KeWaitForSingleObject(&pList->innerPack.Event, Executive, KernelMode, FALSE, &timeout);
 	bRet = (BOOLEAN)pList->innerPack.Access;
 	// 删除空间

@@ -26,6 +26,8 @@ public:
 // й╣ож
 
 	DECLARE_MESSAGE_MAP()
+public:
+	void	GetGuardType(ULONG nType, TCHAR* pType);
 };
 
 extern CTestDriverApp theApp;

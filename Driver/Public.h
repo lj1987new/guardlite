@@ -1,15 +1,16 @@
 #pragma once
 
 typedef struct _guardpath {
-	WCHAR				szGuardPath[512];
-	WCHAR				szSubPath[126];
+	ULONG				nSubType;
+	WCHAR*				pGuardPath;
+	WCHAR*				pSubPath;
 	ULONG				ulPathHash;
 } GUARDPATH, *PGUARDPATH;
 
 // ¹«¹²º¯Êý
 NTSTATUS				AddIrpToQueue(PIRP pIrp);
 NTSTATUS				ResponseToQueue(PIRP pIrp);
-BOOLEAN					CheckRequestIsAllowed(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath);
+BOOLEAN					CheckRequestIsAllowed(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath, LPCWSTR lpValue);
 void					EraseFromQueue(PINNERPACK_LIST pQuery);
 void					SetPackForQuery(ULONG nWaitID, BOOLEAN Access);
 NTSTATUS				DealIrpAndPackQueue();

@@ -78,6 +78,7 @@ typedef struct _IRP_Read_Stack{
 // 全局变量
 extern PACK_QUEUE			gPackQueue;
 extern IRP_READ_STACK		gIrpReadStack;
+extern LONG					gGuardStatus;
 //////////////////////////////////////////////////////////////////////////
 // 主驱动模块函数
 NTSTATUS	DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath);

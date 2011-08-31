@@ -65,6 +65,9 @@ BOOL CTestDriverApp::InitInstance()
 	// 打开驱动
 	HANDLE			hGuardLite			= NULL;
 	DWORD			dwRead				= 0;
+	TCHAR			szTestType[128]				= {0};
+
+// 	GetGuardType(MAKEGUARDTYPE(1, 1), szTestType);
 
 	hGuardLite = CreateFile(_T("\\\\.\\GuardLite")
 		, GENERIC_READ|GENERIC_WRITE
@@ -103,34 +106,21 @@ BOOL CTestDriverApp::InitInstance()
 		CTestDriverDlg			dlg;
 		HANDLE					hProc;
 		TCHAR					szPath[MAX_PATH]		= {0};
-		TCHAR					szType[32]				= {0};
+		TCHAR					szType[128]				= {0};
 
-		switch(request.dwMonType)
-		{
-		case 0x1:
-			_tcscpy(szType, _T("注册表"));
-			break;
-		case 0x2:
-			_tcscpy(szType, _T("文件"));
-			break;
-		case 0x4:
-			_tcscpy(szType, _T("服务"));
-			break;
-		default:
-			_tcscpy(szType, _T("未知"));
-			break;
-		}
+		GetGuardType(request.dwGuardType, szType);
 
 		hProc = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, request.dwProcessID);
 		GetProcessImageFileName(hProc, szPath, MAX_PATH);
 		CloseHandle(hProc);
 		//m_pMainWnd = &dlg;
 
-		dlg.m_strInfo.Format(_T("监控类型: %s\r\n进程名: %s\r\n监控路径: %s\r\n监控子目录: %s\r\n")
+		dlg.m_strInfo.Format(_T("监控类型: %s\r\n进程名: %s\r\n监控路径: %s\r\n监控子目录: %s\r\n值: %s\r\n")
 			, szType
 			, szPath
 			, request.szPath
-			, request.szSubPath);
+			, request.szSubPath
+			, request.szValue);
 
 		INT_PTR nResponse = dlg.DoModal();
 		//m_pMainWnd = NULL;
@@ -147,4 +137,33 @@ BOOL CTestDriverApp::InitInstance()
 	// 由于对话框已关闭，所以将返回 FALSE 以便退出应用程序，
 	//  而不是启动应用程序的消息泵。
 	return FALSE;
+}
+
+void CTestDriverApp::GetGuardType(ULONG nType, TCHAR* pType)
+{
+	if(MASK_GUARDLITE_REGMON == (nType & MASK_GUARDLITE_REGMON))
+	{
+		switch(nType >> 16)
+		{
+		case MASK_SYSTEM_AUTORUN:
+			_tcscpy(pType, _T("注册表-自启动项"));
+			break;
+		default:
+			_tcscpy(pType, _T("注册表"));
+			break;
+		}
+	}
+	else if(MASK_GUARDLITE_FILEMON == (nType & MASK_GUARDLITE_REGMON))
+	{
+		_tcscpy(pType, _T("文件"));
+	}
+	else if(MASK_GUARDLITE_SERVICESMON == (nType & MASK_GUARDLITE_REGMON))
+	{
+		_tcscpy(pType, _T("服务"));
+	}
+	else
+	{
+		//_tcscpy(pType, _T("未知"));
+		_ltot(nType & 0xffff, pType, 16);
+	}
 }
