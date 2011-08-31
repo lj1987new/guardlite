@@ -157,8 +157,8 @@ BOOLEAN		IsRegGuardPath(PCWSTR pPath)
 	{
 		if(ulHash != RegGuardPath[i].ulPathHash)
 			continue;
-		if(_wcsicmp(pPath, RegGuardPath[i].szGuardPath) == 0)
-			return TRUE;
+		/*if(_wcsicmp(pPath, RegGuardPath[i].szGuardPath) == 0)*/
+		return TRUE;
 	}
 	return FALSE;
 }
