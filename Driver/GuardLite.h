@@ -34,7 +34,7 @@ typedef struct _IRP_LIST{
 
 // 检测到一个包的数据申名
 typedef struct _GuardLiteInnerPack{
-	GUARDLITEPACK			Pack;		// 外部的数据结构
+	GUARDLITEREQUEST			Pack;		// 外部的数据结构
 	KEVENT					Event;		// 待事件
 	BOOLEAN					Timeout;	// 是否超时
 	BOOLEAN					Read;		// 是否被读取
@@ -52,7 +52,7 @@ typedef struct _PACK_QUEUE{
 	LIST_ENTRY					list;
 	ULONG						ulWaitID;
 	KMUTEX						mutex;
-	PNPAGED_LOOKASIDE_LIST		lookaside;
+	NPAGED_LOOKASIDE_LIST		lookaside;
 } PACK_QUEUE;
 
 // 设备扩展定义
@@ -85,6 +85,8 @@ NTSTATUS	DriverDispatchRoutine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
 NTSTATUS	DriverDeviceControlRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
 NTSTATUS	DriverCloseRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
 NTSTATUS	DriverCreateRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
+BOOLEAN		IsGuardStart();
+void		DriverUnload(PDRIVER_OBJECT pDriverObject);
 
 //////////////////////////////////////////////////////////////////////////
 // 文件监控模块函数
@@ -117,6 +119,7 @@ NTSTATUS	ProcmonDispatchRoutine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
 //////////////////////////////////////////////////////////////////////////
 // 公共函数
 NTSTATUS				AddIrpToQueue(PIRP pIrp);
+NTSTATUS				ResponseToQueue(PIRP pIrp);
 PINNERPACK_LIST			AddPackToQueue(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath);
 void					RemovePackToQueue(PINNERPACK_LIST pQuery);
 void					SetPackForQuery(ULONG nWaitID, BOOLEAN Access);

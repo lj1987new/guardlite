@@ -7,6 +7,8 @@
 PACK_QUEUE		gPackQueue;
 #pragma LOCKEDDATA
 IRP_READ_STACK	gIrpReadStack;
+#pragma LOCKEDDATA
+LONG			gGuardStatus;
 
 // 驱动主函数
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath)
@@ -25,6 +27,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	pDriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = DriverDeviceControlRuntine;
 	pDriverObject->MajorFunction[IRP_MJ_CLOSE] = DriverCloseRuntine;
 	pDriverObject->MajorFunction[IRP_MJ_CREATE] = DriverCreateRuntine;
+	pDriverObject->DriverUnload = DriverUnload;
 	// 创建管理设备
 	status = IoCreateDevice(pDriverObject
 		, sizeof(DEVICE_EXTENSION)
@@ -51,7 +54,27 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	pDevExt->DeviceType = GLDT_Main;
 	RtlCopyUnicodeString(&pDevExt->LinkName, &usLinkName);
 	pDevExt->StartMask = 0L;
+	// 注册监控函数
+	gGuardStatus = 0L;
+	if(STATUS_SUCCESS != FilemonEntry(pDriverObject, pRegistryPath))
+		goto failed;
+	if(STATUS_SUCCESS != RegmonEntry(pDriverObject, pRegistryPath))
+		goto failed;
+	if(STATUS_SUCCESS != ServicesEntry(pDriverObject, pRegistryPath))
+		goto failed;
+	if(STATUS_SUCCESS != ProcmonEntry(pDriverObject, pRegistryPath))
+		goto failed;
+	goto successed;
+failed:
+	FilemonUnload();
+	RegmonUnload();
+	ServicesUnload();
+	ProcmonUnload();
+	IoDeleteSymbolicLink(&usLinkName);
+	IoDeleteDevice(pCtrlDev);
+	return STATUS_ABANDONED; 
 	// 初始化PACK链表
+successed:
 	InitializeListHead(&gPackQueue.list);
 	ExInitializeNPagedLookasideList(&gPackQueue.lookaside, NULL, NULL, 0, sizeof(INNERPACK_LIST), PAGE_DEBUG, 0);
 	gPackQueue.ulWaitID = 0L;
@@ -85,6 +108,18 @@ NTSTATUS DriverCreateRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp)
 // 关闭例程
 NTSTATUS DriverCloseRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp)
 {
+	PIRP			pReadIrp;
+
+	do 
+	{
+		pReadIrp = IrpReadStackPop();
+		if(NULL == pReadIrp)
+			break;
+		pReadIrp->IoStatus.Information = 0;
+		pReadIrp->IoStatus.Status = STATUS_CANCELLED;
+		IoCompleteRequest(pReadIrp, IO_NO_INCREMENT);
+	} while (TRUE);
+
 	pIrp->IoStatus.Information = 0;
 	pIrp->IoStatus.Status = STATUS_SUCCESS;
 	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
@@ -94,9 +129,69 @@ NTSTATUS DriverCloseRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp)
 // 控制例程
 NTSTATUS DriverDeviceControlRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp)
 {
+	PIO_STACK_LOCATION			pStack;
+
+	pStack = IoGetCurrentIrpStackLocation(pIrp);
 	pIrp->IoStatus.Information = 0;
 	pIrp->IoStatus.Status = STATUS_SUCCESS;
+
+	switch(pStack->Parameters.DeviceIoControl.IoControlCode)
+	{
+	case GUARDLITE_CTRL_START:
+		gGuardStatus = 1L;
+		break;
+	case GUARDLITE_CTRL_STOP:
+		gGuardStatus = 0L;
+		break;
+	case GUARDLITE_CTRL_STATUS:
+		{
+			if(pStack->Parameters.DeviceIoControl.OutputBufferLength >= sizeof(ULONG))
+			{
+				RtlCopyMemory(pIrp->AssociatedIrp.SystemBuffer, &gGuardStatus, sizeof(ULONG));
+				pIrp->IoStatus.Information = sizeof(ULONG);
+			}
+			else
+			{
+				pIrp->IoStatus.Information = 0;
+				pIrp->IoStatus.Status = STATUS_BUFFER_OVERFLOW;
+			}
+		}
+		break;
+	case GUARDLITE_CTRL_REQUEST:
+		return AddIrpToQueue(pIrp);
+	case GUARDLITE_CTRL_RESPONSE:
+		return ResponseToQueue(pIrp);
+	}
+
 	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
 	return STATUS_SUCCESS;
 }
 
+// 监控是否开启
+BOOLEAN IsGuardStart()
+{
+	return FALSE != gGuardStatus;
+}
+
+// 御载驱动
+void DriverUnload(PDRIVER_OBJECT pDriverObject)
+{
+	PDEVICE_OBJECT			pNextDev;
+
+	FilemonUnload();
+	RegmonUnload();
+	ServicesUnload();
+	ProcmonUnload();
+	
+	pNextDev = pDriverObject->DeviceObject;
+	while(NULL != pNextDev)
+	{
+		PDEVICE_OBJECT		pCurDev		= pNextDev;
+		PDEVICE_EXTENSION	pDevExt;
+		
+		pNextDev = pNextDev->NextDevice;
+		pDevExt = (PDEVICE_EXTENSION)pCurDev->DeviceExtension;
+		IoDeleteSymbolicLink(&pDevExt->LinkName);
+		IoDeleteDevice(pCurDev);
+	}
+}
