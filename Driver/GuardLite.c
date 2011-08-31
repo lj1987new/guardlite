@@ -2,6 +2,8 @@
  *	Çý¶¯Ö÷Ä£¿é
  */
 #include "GuardLite.h"
+#include "Regmon.h"
+#include "Public.h"
 
 #pragma LOCKEDDATA
 PACK_QUEUE		gPackQueue;

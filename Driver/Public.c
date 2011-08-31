@@ -2,6 +2,7 @@
  *	公共服务模块
  */
 #include "GuardLite.h"
+#include "Public.h"
 
 // 添加IRP队列
 NTSTATUS		AddIrpToQueue(PIRP pIrp)
@@ -182,4 +183,29 @@ PIRP		IrpReadStackPop()
 	KeReleaseSpinLock(&gIrpReadStack.spinkLock, irql);
 
 	return pIrp;
+}
+// 得到HASH过的路径
+ULONG					GetHashUprPath(LPCWSTR lpPath)
+{
+	ULONG			ul			= 0;
+	ULONG			i;
+	ULONG			uSize;
+	WCHAR			wc;
+
+	uSize = wcslen(lpPath);
+	for(i = 0; i < uSize; i++)
+	{
+		wc = lpPath[i];
+		if(wc >= L'a' && wc <= L'z')
+			wc = wc - L'a' + L'A';
+
+		ul = (ul << 3) + wc;
+		ul = ul >> 29;
+		if(ul)
+		{
+			ul ^= ul;
+		}
+	}
+
+	return ul;
 }

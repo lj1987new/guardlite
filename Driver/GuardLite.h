@@ -73,6 +73,7 @@ typedef struct _IRP_Read_Stack{
 	LONG			lPos;			// 当前指针
 	KSPIN_LOCK		spinkLock;		// 自旋锁
 }IRP_READ_STACK;
+
 //////////////////////////////////////////////////////////////////////////
 // 全局变量
 extern PACK_QUEUE			gPackQueue;
@@ -94,14 +95,6 @@ NTSTATUS	FilemonEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPat
 void		FilemonUnload();
 NTSTATUS	FilemonDispatchRoutine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
 
-
-//////////////////////////////////////////////////////////////////////////
-// 注册表监控模块函数
-NTSTATUS	RegmonEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath);
-void		RegmonUnload();
-NTSTATUS	RegmonDispatchRoutine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
-
-
 //////////////////////////////////////////////////////////////////////////
 // 服务监控模块
 NTSTATUS	ServicesEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath);
@@ -114,15 +107,3 @@ NTSTATUS	ServicesDispatchRoutine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
 NTSTATUS	ProcmonEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath);
 void		ProcmonUnload();
 NTSTATUS	ProcmonDispatchRoutine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
-
-
-//////////////////////////////////////////////////////////////////////////
-// 公共函数
-NTSTATUS				AddIrpToQueue(PIRP pIrp);
-NTSTATUS				ResponseToQueue(PIRP pIrp);
-PINNERPACK_LIST			AddPackToQueue(ULONG ulType, LPCWSTR lpPath, LPCWSTR lpSubPath);
-void					RemovePackToQueue(PINNERPACK_LIST pQuery);
-void					SetPackForQuery(ULONG nWaitID, BOOLEAN Access);
-NTSTATUS				DealIrpAndPackQueue();
-LONG					IrpReadStackPush(PIRP pIrp);
-PIRP					IrpReadStackPop();
