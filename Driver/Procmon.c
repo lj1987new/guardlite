@@ -2,6 +2,7 @@
 *	½ø³Ì¼à¿ØÄ£¿é
 */
 #include "GuardLite.h"
+#include "Regmon.h"
 
 NTSTATUS	ProcmonEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath)
 {
