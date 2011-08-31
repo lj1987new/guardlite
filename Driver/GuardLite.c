@@ -113,19 +113,7 @@ NTSTATUS DriverCreateRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp)
 // 关闭例程
 NTSTATUS DriverCloseRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp)
 {
-	PIRP			pReadIrp;
-
-	gGuardStatus = 0L;
-	gOptProcess = NULL;
-	do 
-	{
-		pReadIrp = IrpReadStackPop();
-		if(NULL == pReadIrp)
-			break;
-		pReadIrp->IoStatus.Information = 0;
-		pReadIrp->IoStatus.Status = STATUS_CANCELLED;
-		IoCompleteRequest(pReadIrp, IO_NO_INCREMENT);
-	} while (TRUE);
+	CancelReadIrp();
 
 	pIrp->IoStatus.Information = 0;
 	pIrp->IoStatus.Status = STATUS_SUCCESS;
@@ -187,11 +175,14 @@ void DriverUnload(PDRIVER_OBJECT pDriverObject)
 {
 	PDEVICE_OBJECT			pNextDev;
 
+	// 删除各种监控
 	FilemonUnload();
 	RegmonUnload();
 	ServicesUnload();
 	ProcmonUnload();
-	
+	// 完成未处理IRP
+	CancelReadIrp();
+	// 删除设备
 	pNextDev = pDriverObject->DeviceObject;
 	while(NULL != pNextDev)
 	{
@@ -203,4 +194,22 @@ void DriverUnload(PDRIVER_OBJECT pDriverObject)
 		IoDeleteSymbolicLink(&pDevExt->LinkName);
 		IoDeleteDevice(pCurDev);
 	}
+}
+
+// 删除未完成的IRP
+void CancelReadIrp()
+{
+	PIRP			pReadIrp;
+
+	gGuardStatus = 0L;
+	gOptProcess = NULL;
+	do 
+	{
+		pReadIrp = IrpReadStackPop();
+		if(NULL == pReadIrp)
+			break;
+		pReadIrp->IoStatus.Information = 0;
+		pReadIrp->IoStatus.Status = STATUS_CANCELLED;
+		IoCompleteRequest(pReadIrp, IO_NO_INCREMENT);
+	} while (TRUE);
 }

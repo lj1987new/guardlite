@@ -88,6 +88,7 @@ NTSTATUS	DriverCloseRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
 NTSTATUS	DriverCreateRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
 BOOLEAN		IsGuardStart();
 void		DriverUnload(PDRIVER_OBJECT pDriverObject);
+void		CancelReadIrp();
 
 //////////////////////////////////////////////////////////////////////////
 // 文件监控模块函数

@@ -14,8 +14,16 @@ PSRVTABLE					ServiceTable			= NULL;
 
 
 GUARDPATH		RegGuardPath[]		= {
-	{L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0}
-	, {L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0}
+	{L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", L"", 0}
+	, {L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", L"", 0}
+	, {L"HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows", L"load", 0}
+	, {L"HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", L"Userinit", 0}
+	, {L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce", L"", 0}
+	, {L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce", L"", 0}
+	, {L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices", L"", 0}
+	, {L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices", L"", 0}
+	, {L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup", L"", 0}
+	, {L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup", L"", 0}
 };
 
 ROOTKEY CurrentUser[] = {
@@ -24,11 +32,11 @@ ROOTKEY CurrentUser[] = {
 };
 
 ROOTKEY RootKey[] = {
-	{ L"\\REGISTRY\\USER", L"HKU", 0 },
-	{ L"\\REGISTRY\\MACHINE\\SYSTEM\\CURRENTCONTROLSET\\HARDWARE PROFILES\\CURRENT", 
-	L"HKCC", 0 },
-	{ L"\\REGISTRY\\MACHINE\\SOFTWARE\\CLASSES", L"HKCR", 0 },
-	{ L"\\REGISTRY\\MACHINE", L"HKLM", 0 }
+	{ L"\\REGISTRY\\USER", L"HKU", 0 }
+	, { L"\\REGISTRY\\MACHINE", L"HKLM", 0 }
+	, { L"\\REGISTRY\\MACHINE\\SYSTEM\\CURRENTCONTROLSET\\HARDWARE PROFILES\\CURRENT", 
+		L"HKCC", 0 }
+	, { L"\\REGISTRY\\MACHINE\\SOFTWARE\\CLASSES", L"HKCR", 0 }
 };
 
 PAGED_LOOKASIDE_LIST			gRegMonLooaside;
@@ -148,7 +156,7 @@ void ConvertKeyPath(LPWSTR pOut, LPWSTR pIn, int nLen)
 /*
  *	查看路径是否监控的路径
  */
-BOOLEAN		IsRegGuardPath(PCWSTR pPath)
+BOOLEAN		IsRegGuardPath(PCWSTR pPath, PCWSTR pSubPath)
 {
 	ULONG			ulHash			= GetHashUprPath(pPath);
 	int				i;
@@ -158,7 +166,13 @@ BOOLEAN		IsRegGuardPath(PCWSTR pPath)
 		if(ulHash != RegGuardPath[i].ulPathHash)
 			continue;
 		/*if(_wcsicmp(pPath, RegGuardPath[i].szGuardPath) == 0)*/
-		return TRUE;
+
+		if(0 == RegGuardPath[i].szSubPath[0])
+			return TRUE;
+		if(0 == _wcsicmp(pSubPath, RegGuardPath[i].szSubPath))
+			return TRUE;
+		
+		return FALSE;
 	}
 	return FALSE;
 }
@@ -192,13 +206,13 @@ NTSTATUS RegSetValueKey( IN HANDLE KeyHandle, IN PUNICODE_STRING ValueName,
 		// 转换路径
 		ConvertKeyPath(szFullPath, fullUniName->Buffer, MAXPATHLEN);
 		ExFreeToPagedLookasideList(&gRegMonLooaside, fullUniName);
-		// 比较路径
-		if(FALSE == IsRegGuardPath(szFullPath))
-			goto allowed;
-		// 到用户求请
+		// 复制路径
 		wcsncpy(szValueName, (NULL != ValueName)?ValueName->Buffer:L""
 			, (NULL != ValueName)?ValueName->Length:0);
-
+		// 比较路径
+		if(FALSE == IsRegGuardPath(szFullPath, szValueName))
+			goto allowed;
+		// 到用户求请
 		if(FALSE != CheckRequestIsAllowed(MASK_GUARDLITE_REGMON, szFullPath, szValueName))
 			goto allowed;
 	}
