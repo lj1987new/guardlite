@@ -184,7 +184,11 @@ PIRP		IrpReadStackPop()
 
 	return pIrp;
 }
-// 得到HASH过的路径
+/*
+ *	得到HASH过的路径
+ *
+ *  AP Hash
+ */
 ULONG					GetHashUprPath(LPCWSTR lpPath)
 {
 	ULONG			ul			= 0;
@@ -199,13 +203,15 @@ ULONG					GetHashUprPath(LPCWSTR lpPath)
 		if(wc >= L'a' && wc <= L'z')
 			wc = wc - L'a' + L'A';
 
-		ul = (ul << 3) + wc;
-		ul = ul >> 29;
-		if(ul)
+		if( (i & 1) == 0)
 		{
-			ul ^= ul;
+			ul ^= ( (ul << 7) ^ wc ^ (ul >> 3) );
+		}
+		else
+		{
+			ul ^= ( ~((ul << 11) ^ wc ^ (ul >> 5)) );
 		}
 	}
 
-	return ul;
+	return ( ul & 0x7FFFFFFF );
 }
