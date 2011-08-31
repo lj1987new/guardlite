@@ -13,3 +13,4 @@ SOURCES=GuardLite.c\
 		Filemon.c\
 		Servicesmon.c\
 		Public.c\
+		Procmon.c\
