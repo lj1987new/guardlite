@@ -25,10 +25,13 @@ GUARDPATH		RegGuardPath[]		= {
 	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup", NULL, 0}
 	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup", NULL, 0}
 	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", NULL, 0}
 	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\run", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\run", NULL, 0}
 	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RUNSERVICESONCE", NULL, 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", L"Shell", 0}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\System\\ControlSet001\\Session Manager", L"BootExecute", 0}
 	, {MASK_SYSTEM_SCREEN, L"HKCU\\Control Panel\\Desktop", L"Scrnsave.exe", 0}
 };
 
