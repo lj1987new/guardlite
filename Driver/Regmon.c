@@ -14,25 +14,25 @@ PSRVTABLE					ServiceTable			= NULL;
 
 
 GUARDPATH		RegGuardPath[]		= {
-	{MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows", L"load", 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", L"Userinit", 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\run", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\run", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RUNSERVICESONCE", NULL, 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", L"Shell", 0}
-	, {MASK_SYSTEM_AUTORUN, L"HKLM\\System\\ControlSet001\\Session Manager", L"BootExecute", 0}
-	, {MASK_SYSTEM_SCREEN, L"HKCU\\Control Panel\\Desktop", L"Scrnsave.exe", 0}
+	{MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows", L"load", 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", L"Userinit", 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServicesOnce", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\Setup", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnceEx", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\run", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\run", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RUNSERVICESONCE", NULL, 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", L"Shell", 0, -1}
+	, {MASK_SYSTEM_AUTORUN, L"HKLM\\System\\ControlSet001\\Session Manager", L"BootExecute", 0, -1}
+	, {MASK_SYSTEM_SCREEN, L"HKCU\\Control Panel\\Desktop", L"Scrnsave.exe", 0, -1}
 };
 
 ROOTKEY CurrentUser[] = {
@@ -64,7 +64,7 @@ NTSTATUS	RegmonEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	for(i = 0; i < arrayof(RootKey); i++)
 		RootKey[i].RootNameLen = wcslen(RootKey[i].RootName);
 	for(i = 0; i < arrayof(RegGuardPath); i++)
-		RegGuardPath[i].ulPathHash = GetHashUprPath(RegGuardPath[i].pGuardPath);
+		RegGuardPath[i].ulPathHash = GetHashUprPath(RegGuardPath[i].pGuardPath, NULL);
 	// 初始化内存分配器
 	ExInitializePagedLookasideList(&gRegMonLooaside, NULL, NULL, 0
 		, MAXPATHLEN * 2 + 2 * sizeof(ULONG), PAGE_DEBUG, 0);
@@ -167,7 +167,7 @@ void ConvertKeyPath(LPWSTR pOut, LPWSTR pIn, int nLen)
  */
 BOOLEAN		IsRegGuardPath(PCWSTR pPath, PCWSTR pSubPath, LONG* pSubType)
 {
-	ULONG			ulHash			= GetHashUprPath(pPath);
+	ULONG			ulHash			= GetHashUprPath(pPath, NULL);
 	int				i;
 
 	for(i = 0; i < arrayof(RegGuardPath); i++)

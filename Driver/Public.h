@@ -5,6 +5,7 @@ typedef struct _guardpath {
 	WCHAR*				pGuardPath;
 	WCHAR*				pSubPath;
 	ULONG				ulPathHash;
+	LONG				nPathLen;
 } GUARDPATH, *PGUARDPATH;
 
 // ¹«¹²º¯Êý
@@ -16,5 +17,5 @@ void					SetPackForQuery(ULONG nWaitID, BOOLEAN Access);
 NTSTATUS				DealIrpAndPackQueue();
 LONG					IrpReadStackPush(PIRP pIrp);
 PIRP					IrpReadStackPop();
-ULONG					GetHashUprPath(LPCWSTR lpPath);
+ULONG					GetHashUprPath(LPCWSTR lpPath, ULONG* pLenHash);
 LONG					mywcsicmp(LPCWSTR pstr1, LPCWSTR pstr2);

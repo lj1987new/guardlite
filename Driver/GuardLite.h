@@ -1,5 +1,6 @@
 #pragma once
 
+#include <fltKernel.h>
 #include <ntddk.h>
 #include "../common/GuardLiteCtrl.h"
 
@@ -18,7 +19,9 @@
 
 #define PAGE_DEBUG			'etiL'
 
-
+#ifndef MAX_PATH
+#define MAX_PATH			256
+#endif
 // 设备类型
 typedef enum _GuardLiteDeviceType
 {
@@ -91,11 +94,6 @@ BOOLEAN		IsGuardStart();
 void		DriverUnload(PDRIVER_OBJECT pDriverObject);
 void		CancelReadIrp();
 
-//////////////////////////////////////////////////////////////////////////
-// 文件监控模块函数
-NTSTATUS	FilemonEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath);
-void		FilemonUnload();
-NTSTATUS	FilemonDispatchRoutine(PDEVICE_OBJECT pDevObj, PIRP pIrp);
 
 //////////////////////////////////////////////////////////////////////////
 // 服务监控模块
