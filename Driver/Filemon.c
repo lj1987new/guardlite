@@ -76,6 +76,10 @@ NTSTATUS	FilemonEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPat
 		FltUnregisterFilter(FltData.Filter);
 		return status;
 	}
+	// 初始
+	KeInitializeSpinLock(&FltData.spinkLock);
+	InitializeListHead(&FltData.listGuard);
+
 	return STATUS_SUCCESS;
 }
 
@@ -286,4 +290,24 @@ BOOLEAN			IsFilemonGuardPath(PWSTR pPath, BOOLEAN isDir, LONG* pSubType)
 	}
 
 	return FALSE;
+}
+// 添加目录到监控目录
+NTSTATUS FilemonAddGuardPath(PIO_STACK_LOCATION pStack, PIRP pIrp)
+{
+
+	return STATUS_SUCCESS;
+}
+// 清空监控目录
+NTSTATUS FilemonCleanGuardPath(PIO_STACK_LOCATION pStack, PIRP pIrp)
+{
+	KIRQL			irql;
+	PLIST_ENTRY		pList		= NULL;
+	
+	KeAcquireSpinLock(&FltData.spinkLock, &irql);
+	while(&FltData.listGuard != (pList = RemoveHeadList(&FltData.listGuard)))
+	{
+		PFILEMON_GUARD		pGuardPath		= NULL;
+	}
+	KeReleaseSpinLock(&FltData.spinkLock, irql);
+	return STATUS_SUCCESS;
 }

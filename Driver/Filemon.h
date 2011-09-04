@@ -16,6 +16,9 @@ FLT_POSTOP_CALLBACK_STATUS FilemonPostCreate (__inout PFLT_CALLBACK_DATA Data
 											  , __in_opt PVOID CompletionContext
 											  , __in FLT_POST_OPERATION_FLAGS Flags);
 
+NTSTATUS FilemonAddGuardPath(PIO_STACK_LOCATION pStack, PIRP pIrp);
+NTSTATUS FilemonCleanGuardPath(PIO_STACK_LOCATION pStack, PIRP pIrp);
+
 NTSTATUS FltUnload (__in FLT_FILTER_UNLOAD_FLAGS Flags);
 
 NTSTATUS FltQueryTeardown (__in PCFLT_RELATED_OBJECTS FltObjects
@@ -31,15 +34,17 @@ BOOLEAN			IsFilemonGuardPath(PWSTR pPath, BOOLEAN isDir, LONG* pSubType);
 
 //////////////////////////////////////////////////////////////////////////
 typedef struct _FLT_FILEMON_DATA {
-	PDRIVER_OBJECT		DriverObject;
-	PFLT_FILTER			Filter;
+	PDRIVER_OBJECT				DriverObject;
+	PFLT_FILTER					Filter;
 	// 模块所在目录
-	UNICODE_STRING		usModulePath;
-	UNICODE_STRING		usVolumePath;
+	UNICODE_STRING				usModulePath;
+	UNICODE_STRING				usVolumePath;
 	// 模块所在组
-	PFLT_VOLUME			fltVolume;
-	HANDLE				hSysFile;
-
+	PFLT_VOLUME					fltVolume;
+	HANDLE						hSysFile;
+	// 监控目录控制
+	LIST_ENTRY					listGuard;
+	KSPIN_LOCK					spinkLock;		// 自旋锁
 } FLT_FILEMON_DATA, *PFLT_FILEMON_DATA;
 
 typedef struct _SCANNER_STREAM_HANDLE_CONTEXT {
@@ -47,3 +52,10 @@ typedef struct _SCANNER_STREAM_HANDLE_CONTEXT {
 	BOOLEAN RescanRequired;
 
 } SCANNER_STREAM_HANDLE_CONTEXT, *PSCANNER_STREAM_HANDLE_CONTEXT;
+
+typedef struct _FILEMON_GUARDPATH{
+	LIST_ENTRY		list;
+	ULONG			ulHash;
+	LONG			nLen;
+	WCHAR			szPath[512];
+}FILEMON_GUARDPATH, *PFILEMON_GUARDPATH;
