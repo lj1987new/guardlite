@@ -3,6 +3,7 @@
  */
 #include "GuardLite.h"
 #include "Regmon.h"
+#include "Filemon.h"
 #include "Public.h"
 
 #pragma LOCKEDDATA

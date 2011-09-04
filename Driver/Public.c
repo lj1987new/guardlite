@@ -210,12 +210,13 @@ PIRP		IrpReadStackPop()
  *
  *  AP Hash
  */
-ULONG					GetHashUprPath(LPCWSTR lpPath)
+ULONG					GetHashUprPath(LPCWSTR lpPath, ULONG* pLenHash)
 {
 	ULONG			ul			= 0;
 	ULONG			i;
 	ULONG			uSize;
 	WCHAR			wc;
+	ULONG			nLen		= 0;
 
 	uSize = wcslen(lpPath);
 	for(i = 0; i < uSize; i++)
@@ -231,6 +232,11 @@ ULONG					GetHashUprPath(LPCWSTR lpPath)
 		else
 		{
 			ul ^= ( ~((ul << 11) ^ wc ^ (ul >> 5)) );
+		}
+		// 存储每一步的HASH
+		if(NULL != pLenHash && nLen < MAX_PATH)
+		{
+			pLenHash[nLen] = ul & 0x7FFFFFFF;
 		}
 	}
 
