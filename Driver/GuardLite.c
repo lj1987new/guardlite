@@ -159,6 +159,10 @@ NTSTATUS DriverDeviceControlRuntine(PDEVICE_OBJECT pDevObj, PIRP pIrp)
 		return AddIrpToQueue(pIrp);
 	case GUARDLITE_CTRL_RESPONSE:
 		return ResponseToQueue(pIrp);
+	case GUARDLITE_CTRL_ADDFILEGUARD:
+		return ;
+	case GUARDLITE_CTRL_CLEANFILEGUARD:
+		return ;
 	}
 
 	IoCompleteRequest(pIrp, IO_NO_INCREMENT);
