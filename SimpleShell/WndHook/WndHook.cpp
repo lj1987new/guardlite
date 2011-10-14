@@ -90,15 +90,9 @@ LRESULT CALLBACK WndHookCBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 		hParent = GetParent(hWnd);
 		if(NULL == hParent || GetDesktopWindow() == hParent)
 		{
-			TCHAR			szClass[512]	= {0};
-
-			GetClassName(hWnd, szClass, 512);
-			if(_tcscmp(_T("#32770"), szClass) != 0)
+			if(NULL != pcbt->lpcs && (pcbt->lpcs->style & WS_MAXIMIZEBOX))
 			{
-				pcbt->lpcs->cx = 1024;
-				pcbt->lpcs->cy = 768;
-				pcbt->lpcs->x = 0;
-				pcbt->lpcs->y = 0;			
+				PostMessage(hWnd, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
 			}
 		}
 	}
@@ -135,7 +129,7 @@ LRESULT CALLBACK WndHookCBTProc(int nCode, WPARAM wParam, LPARAM lParam)
 			DWORD			dwOpt			= LOWORD(lParam);
 
 			GetClassName(hWnd, szClass, 512);
-			if(SW_RESTORE == dwOpt || SW_MINIMIZE == dwOpt || SW_SHOWMINIMIZED == dwOpt
+			if(/*SW_RESTORE == dwOpt ||*/ SW_MINIMIZE == dwOpt || SW_SHOWMINIMIZED == dwOpt
 				|| SW_SHOWMINNOACTIVE == dwOpt || SW_FORCEMINIMIZE == dwOpt)
 			{
 				return -1;
