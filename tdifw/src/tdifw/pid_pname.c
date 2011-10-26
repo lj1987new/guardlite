@@ -20,6 +20,8 @@
 
 #include "memtrack.h"
 #include "pid_pname.h"
+#include "sock.h"			
+#include "ipc.h"		
 
 /* process list entry */
 struct plist_entry {
@@ -229,19 +231,33 @@ find_ple(ULONG pid, KIRQL *irql, struct plist_entry **prev)
 }
 
 // notify routine on process creation or removing
+extern int tdifw_filter(struct flt_request *request);
+
 VOID
 ProcessNotifyProc(IN HANDLE ParentId, IN HANDLE ProcessId, IN BOOLEAN Create)
 {
 	KIRQL irql;
 	struct plist_entry *ple, *prev_ple;
+	struct flt_request request = { 0 }; 
+
+	request.pid = (ULONG)ProcessId;
 
 	if (Create) {
+
+		// add by tan wen
+		request.type = TYPE_PROCESS_CREATE;
+		tdifw_filter(&request);
+
 		KdPrint(("[tdi_fw] ProcessNotifyProc: create process with pid:%u\n", ProcessId));
 
 		add_ple((ULONG)ProcessId, &irql);
 		KeReleaseSpinLock(&g_plist.guard, irql);
 
 	} else {
+
+		request.type = TYPE_PROCESS_TERMINATE;
+		tdifw_filter(&request);
+
 		// remove entry from plist
 
 		KdPrint(("[tdi_fw] ProcessNotifyProc: remove process with pid:%u\n", ProcessId));
