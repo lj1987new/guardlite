@@ -23,7 +23,8 @@
 #include "memtrack.h"
 
 #define MAGIC	'TMEM'
-#define INT_3	__asm int 3
+//#define INT_3	__asm int 3
+#define INT_3
 
 struct prefix {
 	ULONG		magic;

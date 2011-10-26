@@ -1,40 +1,21 @@
 TARGETNAME=NetProc
-TARGETPATH=obj
+TARGETPATH=build
 TARGETTYPE=DRIVER
 
 TARGETLIBS=$(DDK_LIB_PATH)\tdi.lib
+
+!if "$(AMD64)" == "1"
+TARGETLIBS=$(TARGETLIBS)\
+			$(TARGETPATH)\ia64\tdifw_drv.lib
+!else
+TARGETLIBS=$(TARGETLIBS)\
+			$(TARGETPATH)\i386\tdifw_drv.lib
+!endif
 
 C_DEFINES=-DUSE_PACKET_ENGINE
 # You can specify this define too: -DUSE_TDI_HOOKING
 
 # USER_INCLUDES=..;$(NTMAKEENV)\..\src\network\inc
 
-SOURCES=	NetProc.c \
-			tdifw\tdi_fw.c \
-			tdifw\dispatch.c \
-			tdifw\disp_conn.c \
-			tdifw\disp_dg.c \
-			tdifw\disp_ev.c \
-			tdifw\disp_obj.c \
-			tdifw\events.c \
-			tdifw\ev_conn.c \
-			tdifw\ev_dg.c \
-			tdifw\filter.c \
-			tdifw\memtrack.c \
-			tdifw\obj_tbl.c \
-			tdifw\sock.c \
-			tdifw\ipc.c \
-			tdifw\pid_pname.c \
-			tdifw\packet.c \
-			tdifw\conn_state.c \
-			tdifw\sids.c \
-			tdifw\disp_sr.c \
-			tdifw\ev_recv.c
+SOURCES=	NetProc.c 
 
-!if "$(NTDEBUG)"=="ntsdnodbg"
-NTDEBUG=
-!endif
-
-!ifndef NTDEBUG
-NTDEBUG=retail
-!endif
