@@ -206,6 +206,12 @@ filter_free(void)
 	((char_mask)[(num) / 8] & (1 << ((num) % 8)))
 
 // quick filter (I mean "synchronous" (can work at DISPATCH_LEVEL))
+int tdifw_filter(struct flt_request *request);
+int quick_filter(struct flt_request *request, struct flt_rule *rule)
+{
+	return tdifw_filter(request);
+}
+/*
 int
 quick_filter(struct flt_request *request, struct flt_rule *rule)
 {
@@ -294,6 +300,7 @@ quick_filter(struct flt_request *request, struct flt_rule *rule)
 	request->result = result;
 	return result;
 }
+*/
 
 // write request to request queue
 BOOLEAN
