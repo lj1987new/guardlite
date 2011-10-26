@@ -30,7 +30,8 @@ void	*mt_malloc(ULONG size, const char *file, ULONG line);
 void free(void *ptr);
 
 // debug macro
-#define _TEST_ME_	__asm int 3
+//#define _TEST_ME_	__asm int 3
+#define _TEST_ME_
 
 #else /* DBG */
 

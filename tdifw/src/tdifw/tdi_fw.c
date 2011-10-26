@@ -405,10 +405,11 @@ get_device_object(wchar_t *name, PDEVICE_OBJECT *devobj)
 
 /* dispatch */
 NTSTATUS
-tdifw_DeviceDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP irp)
+tdifw_DeviceDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP irp, OUT BOOLEAN* pBDispatch)
 {
 	PIO_STACK_LOCATION irps;
 	NTSTATUS status				= -1;
+	*pBDispatch					= TRUE;
 
 	// sanity check
 	if (irp == NULL) {
@@ -640,7 +641,7 @@ tdifw_DeviceDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP irp)
 	
 		}*/
 	 else {
-
+		*pBDispatch = FALSE;
 		KdPrint(("[tdi_fw] DeviceDispatch: ioctl for unknown DeviceObject 0x%x\n", DeviceObject));
 
 /*
