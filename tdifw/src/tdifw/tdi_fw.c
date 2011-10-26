@@ -26,6 +26,7 @@
 #include "memtrack.h"
 #include "obj_tbl.h"
 #include "tdi_fw.h"
+#include "tdi_fw_lib.h"
 
 #define IOCTL_TRANSFER_TYPE(ioctl)	((ioctl) & 3)
 
@@ -42,8 +43,8 @@ typedef struct {
 
 /* prototypes */
 
-static NTSTATUS	DeviceDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP irp);
-static VOID		OnUnload(IN PDRIVER_OBJECT DriverObject);
+// static NTSTATUS	DeviceDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP irp);
+// static VOID		OnUnload(IN PDRIVER_OBJECT DriverObject);
 
 #ifndef USE_TDI_HOOKING
 static NTSTATUS	c_n_a_device(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT *fltobj,
@@ -61,9 +62,9 @@ static NTSTATUS	tdi_skip_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, I
 PDEVICE_OBJECT
 	g_tcpfltobj = NULL,		// \Device\Tcp
 	g_udpfltobj = NULL,		// \Device\Udp
-	g_ipfltobj = NULL,		// \Device\RawIp
-	g_devcontrol = NULL,	// control device (exclusive access only!)
-	g_devnfo = NULL;		// information device 
+	g_ipfltobj = NULL;		// \Device\RawIp
+// 	g_devcontrol = NULL,	// control device (exclusive access only!)
+// 	g_devnfo = NULL;		// information device 
 
 BOOLEAN g_got_log = FALSE;	// got log app
 
@@ -87,7 +88,7 @@ KSPIN_LOCK g_traffic_guard;
 
 /* initialization */
 NTSTATUS
-DriverEntry(IN PDRIVER_OBJECT theDriverObject,
+tdifw_DriverEntry(IN PDRIVER_OBJECT theDriverObject,
             IN PUNICODE_STRING theRegistryPath)
 {
     NTSTATUS status = STATUS_SUCCESS;
@@ -119,17 +120,22 @@ DriverEntry(IN PDRIVER_OBJECT theDriverObject,
 		goto done;
 	}
 	
+/*
+	//**xjj 
 	for (i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; i++)
 		theDriverObject->MajorFunction[i] = DeviceDispatch;
+*/
 
 #if DBG
 	// register UnLoad procedure
-	theDriverObject->DriverUnload = OnUnload;
+	// theDriverObject->DriverUnload = OnUnload;
 #endif
 
 	/* create control device and symbolic link */
 
-	RtlInitUnicodeString(&name, L"\\Device\\tdifw");
+	/*
+	//**xjj
+RtlInitUnicodeString(&name, L"\\Device\\tdifw");
 
 	status = IoCreateDevice(theDriverObject,
 							0,
@@ -172,6 +178,7 @@ DriverEntry(IN PDRIVER_OBJECT theDriverObject,
 		KdPrint(("[tdi_fw] DriverEntry: IoCreateSymbolicLink: 0x%x!\n", status));
 		goto done;
 	}
+*/
 
 #ifndef USE_TDI_HOOKING
 
@@ -231,7 +238,7 @@ DriverEntry(IN PDRIVER_OBJECT theDriverObject,
 done:
 	if (status != STATUS_SUCCESS) {
 		// cleanup
-		OnUnload(theDriverObject);
+		tdifw_OnUnload(theDriverObject);
 	}
 
     return status;
@@ -239,7 +246,7 @@ done:
 
 /* deinitialization */
 VOID
-OnUnload(IN PDRIVER_OBJECT DriverObject)
+tdifw_OnUnload(IN PDRIVER_OBJECT DriverObject)
 {
 #ifndef USE_TDI_HOOKING
 	d_n_d_device(DriverObject, g_tcpoldobj, g_tcpfltobj);
@@ -251,6 +258,8 @@ OnUnload(IN PDRIVER_OBJECT DriverObject)
 #endif
 
 	// delete control device and symbolic link
+/*
+	//**xxj
 	if (g_devcontrol != NULL) {
 		UNICODE_STRING linkname;
 		
@@ -258,17 +267,21 @@ OnUnload(IN PDRIVER_OBJECT DriverObject)
 		IoDeleteSymbolicLink(&linkname);
 
 		IoDeleteDevice(g_devcontrol);
-	}
+	}*/
+
 
 	// delete info device and symbolic link
-	if (g_devnfo != NULL) {
-		UNICODE_STRING linkname;
-		
-		RtlInitUnicodeString(&linkname, L"\\??\\tdifw_nfo");
-		IoDeleteSymbolicLink(&linkname);
-
-		IoDeleteDevice(g_devnfo);
-	}
+	/*
+	// **xxj
+		if (g_devnfo != NULL) {
+			UNICODE_STRING linkname;
+			
+			RtlInitUnicodeString(&linkname, L"\\??\\tdifw_nfo");
+			IoDeleteSymbolicLink(&linkname);
+	
+			IoDeleteDevice(g_devnfo);
+		}*/
+	
 
 	filter_free();
 	ot_free();
@@ -392,10 +405,10 @@ get_device_object(wchar_t *name, PDEVICE_OBJECT *devobj)
 
 /* dispatch */
 NTSTATUS
-DeviceDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP irp)
+tdifw_DeviceDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP irp)
 {
 	PIO_STACK_LOCATION irps;
-	NTSTATUS status;
+	NTSTATUS status				= -1;
 
 	// sanity check
 	if (irp == NULL) {
@@ -536,98 +549,101 @@ DeviceDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP irp)
 				completion.routine, completion.context);
 		}
 
-	} else if (DeviceObject == g_devcontrol) {
-
-		/*
-		 * this IRP is for control device
-		 */
-
-		// set default status
-		status = STATUS_SUCCESS;
-
-		if (irps->MajorFunction == IRP_MJ_CREATE) {
-
-			// initialize for user-mode part (exclusive access - 1 user-mode logging part)
-			filter_init_2();
-
-			g_got_log = TRUE;
-
-		} else if (irps->MajorFunction == IRP_MJ_CLOSE) {
-
-			// cleanup for user-mode logging part
-			filter_free_2();
-
-			g_got_log = FALSE;
-
-		} if (irps->MajorFunction == IRP_MJ_DEVICE_CONTROL) {
-
-			/*
-			 * control request
-			 */
-
-			ULONG ioctl = irps->Parameters.DeviceIoControl.IoControlCode,
-				len = irps->Parameters.DeviceIoControl.InputBufferLength,
-				size = irps->Parameters.DeviceIoControl.OutputBufferLength;
-			char *out_buf;
-
-			if (IOCTL_TRANSFER_TYPE(ioctl) == METHOD_NEITHER) {
-				// this type of transfer unsupported
-				out_buf = NULL;
-			} else
-				out_buf = (char *)irp->AssociatedIrp.SystemBuffer;
-
-			// process control request
-			status = process_request(ioctl, out_buf, &len, size);
-
-			irp->IoStatus.Information = len;
-
-		}
-
-		irp->IoStatus.Status = status;
-
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
-
-	} else if (DeviceObject == g_devnfo) {
-
-		/*
-		 * this IRP is for information device
-		 */
-
-		// set default status
-		status = STATUS_SUCCESS;
-
-		if (irps->MajorFunction == IRP_MJ_DEVICE_CONTROL) {
-
-			/*
-			 * control request
-			 */
-
-			ULONG ioctl = irps->Parameters.DeviceIoControl.IoControlCode,
-				len = irps->Parameters.DeviceIoControl.InputBufferLength,
-				size = irps->Parameters.DeviceIoControl.OutputBufferLength;
-			char *out_buf;
-
-			if (IOCTL_TRANSFER_TYPE(ioctl) == METHOD_NEITHER) {
-				// this type of transfer unsupported
-				out_buf = NULL;
-			} else
-				out_buf = (char *)irp->AssociatedIrp.SystemBuffer;
-
-			// process control request
-			status = process_nfo_request(ioctl, out_buf, &len, size);
-
-			irp->IoStatus.Information = len;
-
-		}
-
-		irp->IoStatus.Status = status;
-
-		IoCompleteRequest(irp, IO_NO_INCREMENT);
-
-	} else {
+	} /*
+	else if (DeviceObject == g_devcontrol) {
+	
+			/ *
+			 * this IRP is for control device
+			 * /
+	
+			// set default status
+			status = STATUS_SUCCESS;
+	
+			if (irps->MajorFunction == IRP_MJ_CREATE) {
+	
+				// initialize for user-mode part (exclusive access - 1 user-mode logging part)
+				filter_init_2();
+	
+				g_got_log = TRUE;
+	
+			} else if (irps->MajorFunction == IRP_MJ_CLOSE) {
+	
+				// cleanup for user-mode logging part
+				filter_free_2();
+	
+				g_got_log = FALSE;
+	
+			} if (irps->MajorFunction == IRP_MJ_DEVICE_CONTROL) {
+	
+				/ *
+				 * control request
+				 * /
+	
+				ULONG ioctl = irps->Parameters.DeviceIoControl.IoControlCode,
+					len = irps->Parameters.DeviceIoControl.InputBufferLength,
+					size = irps->Parameters.DeviceIoControl.OutputBufferLength;
+				char *out_buf;
+	
+				if (IOCTL_TRANSFER_TYPE(ioctl) == METHOD_NEITHER) {
+					// this type of transfer unsupported
+					out_buf = NULL;
+				} else
+					out_buf = (char *)irp->AssociatedIrp.SystemBuffer;
+	
+				// process control request
+				status = process_request(ioctl, out_buf, &len, size);
+	
+				irp->IoStatus.Information = len;
+	
+			}
+	
+			irp->IoStatus.Status = status;
+	
+			IoCompleteRequest(irp, IO_NO_INCREMENT);
+	
+		} else if (DeviceObject == g_devnfo) {
+	
+			/ *
+			 * this IRP is for information device
+			 * /
+	
+			// set default status
+			status = STATUS_SUCCESS;
+	
+			if (irps->MajorFunction == IRP_MJ_DEVICE_CONTROL) {
+	
+				/ *
+				 * control request
+				 * /
+	
+				ULONG ioctl = irps->Parameters.DeviceIoControl.IoControlCode,
+					len = irps->Parameters.DeviceIoControl.InputBufferLength,
+					size = irps->Parameters.DeviceIoControl.OutputBufferLength;
+				char *out_buf;
+	
+				if (IOCTL_TRANSFER_TYPE(ioctl) == METHOD_NEITHER) {
+					// this type of transfer unsupported
+					out_buf = NULL;
+				} else
+					out_buf = (char *)irp->AssociatedIrp.SystemBuffer;
+	
+				// process control request
+				status = process_nfo_request(ioctl, out_buf, &len, size);
+	
+				irp->IoStatus.Information = len;
+	
+			}
+	
+			irp->IoStatus.Status = status;
+	
+			IoCompleteRequest(irp, IO_NO_INCREMENT);
+	
+		}*/
+	 else {
 
 		KdPrint(("[tdi_fw] DeviceDispatch: ioctl for unknown DeviceObject 0x%x\n", DeviceObject));
 
+/*
 #ifndef USE_TDI_HOOKING
 		// ??? just complete IRP
 		status = irp->IoStatus.Status = STATUS_SUCCESS;
@@ -636,7 +652,8 @@ DeviceDispatch(IN PDEVICE_OBJECT DeviceObject, IN PIRP irp)
 		// call original handler
 		status = g_old_DriverObject.MajorFunction[irps->MajorFunction](
 			DeviceObject, irp);
-#endif
+#endif*/
+
 	}
 
 	return status;
