@@ -63,6 +63,14 @@ tdi_event_receive(
 	fr.type = TYPE_RECV;
 	fr.data.pdata = Tsdu;
 	fr.data.len = BytesIndicated;
+	{
+		struct ot_entry *ote_conn;
+		KIRQL irql;
+
+		ote_conn = ot_find_fileobj(connobj, &irql);
+		/*fr.addr.from = ote_conn->remote_addr->tp_addr;*/
+		KeReleaseSpinLock(&g_ot_hash_guard, irql);
+	}
 
 	quick_filter(&fr, NULL);
 
