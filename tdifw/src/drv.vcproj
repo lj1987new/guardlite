@@ -326,6 +326,10 @@
 				RelativePath=".\tdifw\tdi_fw.h"
 				>
 			</File>
+			<File
+				RelativePath=".\tdifw\tdi_fw_lib.h"
+				>
+			</File>
 		</Filter>
 	</Files>
 	<Globals>
