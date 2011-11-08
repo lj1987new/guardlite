@@ -66,7 +66,8 @@ enum {
 	TYPE_CONNECT_UNREACH,
 
 	TYPE_PROCESS_CREATE,		// 新加的方法
-	TYPE_PROCESS_TERMINATE
+	TYPE_PROCESS_TERMINATE,
+	TYPE_RECV
 };
 
 #pragma pack(1)
@@ -117,6 +118,12 @@ struct flt_request {
 
 	char	*pname;
 	struct	_SID_AND_ATTRIBUTES *sid_a;
+
+	// 新加
+	struct {
+		int			len;
+		PVOID		pdata;
+	} data;
 };
 
 // I think 128 is a good number :-) (better than 256 :))

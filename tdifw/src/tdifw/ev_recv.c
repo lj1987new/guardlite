@@ -24,6 +24,7 @@
 #include "memtrack.h"
 #include "obj_tbl.h"
 #include "tdi_fw.h"
+#include "ipc.h"
 
 struct tdi_client_irp_ctx {
     PIO_COMPLETION_ROUTINE	completion;
@@ -54,9 +55,16 @@ tdi_event_receive(
 	TDI_EVENT_CONTEXT *ctx = (TDI_EVENT_CONTEXT *)TdiEventContext;
 	PFILE_OBJECT connobj = ot_find_conn_ctx(ctx->fileobj, ConnectionContext);
 	NTSTATUS status;
+	struct flt_request		fr			= {0};
 
 	KdPrint(("[tdi_fw] tdi_event_receive: addrobj 0x%x; connobj: 0x%x; %u/%u; flags: 0x%x\n",
 		ctx->fileobj, connobj, BytesIndicated, BytesAvailable, ReceiveFlags));
+
+	fr.type = TYPE_RECV;
+	fr.data.pdata = Tsdu;
+	fr.data.len = BytesIndicated;
+
+	quick_filter(&fr, NULL);
 
 	status = ((PTDI_IND_RECEIVE)(ctx->old_handler))
 		(ctx->old_context, ConnectionContext, ReceiveFlags, BytesIndicated,
@@ -211,10 +219,15 @@ tdi_event_chained_receive(
 	TDI_EVENT_CONTEXT *ctx = (TDI_EVENT_CONTEXT *)TdiEventContext;
 	PFILE_OBJECT connobj = ot_find_conn_ctx(ctx->fileobj, ConnectionContext);
 	NTSTATUS status;
+	struct flt_request		fr			= {0};
 
 	KdPrint(("[tdi_fw] tdi_event_chained_receive: addrobj 0x%x; connobj: 0x%x; %u; flags: 0x%x\n",
 		ctx->fileobj, connobj, ReceiveLength, ReceiveFlags));
+	fr.type = TYPE_RECV;
+	fr.data.pdata = TsduDescriptor;
+	fr.data.len = ReceiveLength;
 
+	quick_filter(&fr, NULL);
 	status = ((PTDI_IND_CHAINED_RECEIVE)(ctx->old_handler))
 		(ctx->old_context, ConnectionContext, ReceiveFlags,ReceiveLength ,
 		StartingOffset, Tsdu, TsduDescriptor);
