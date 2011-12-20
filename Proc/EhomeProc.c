@@ -18,6 +18,7 @@ NTSTATUS ZwQueryInformationProcess(HANDLE ProcessHandle, PROCESSINFOCLASS Proces
 NTSTATUS	GetProcessFullName(HANDLE hPid, WCHAR* pPath, LONG nLen);
 NTSTATUS	GetProcessFullName3(HANDLE hPid, WCHAR* pPath, LONG nLen);
 NTSTATUS	KillProcess(ULONG64 nPID);
+NTSTATUS	MmUnmapViewOfSection(IN PEPROCESS Process, IN PVOID BaseAddress);
 
 typedef struct _CallbackInfoList{
 	LIST_ENTRY			ListEntry;
@@ -479,52 +480,25 @@ NTSTATUS GetProcessFullName3(HANDLE hPid, WCHAR* pPath, LONG nLen)
 	return status;
 }
 
-ULONG MyReadMemory(IN PVOID BaseAddress,IN SIZE_T BufferSize,IN PEPROCESS EProcess) 
-{ 
-	KAPC_STATE ApcState; 
-	PVOID readbuffer; 
-	NTSTATUS status; 
-
-	if(NULL == EProcess)
-		return 0;
-	readbuffer = ExAllocatePoolWithTag (NonPagedPool, BufferSize, 'mohe'); 
-	if(readbuffer==NULL) 
-	{ 
-		KdPrint(("failed to alloc memory!/n")); 
-		return 0;
-	} 
-	*(ULONG*)readbuffer=(ULONG)0x1; 
-	KeStackAttachProcess (EProcess, &ApcState);
-	__try { 
-		ProbeForRead ((CONST PVOID)BaseAddress, 
-			BufferSize, sizeof(CHAR)); 
-		RtlCopyMemory (readbuffer, BaseAddress, BufferSize); 
-		KeUnstackDetachProcess (&ApcState);
-	} 
-	__except(EXCEPTION_EXECUTE_HANDLER) 
-	{ 
-		KeUnstackDetachProcess (&ApcState); 
-	} 
-	KdPrint(("%x/n",*(ULONG*)readbuffer)); 
-	ExFreePool (readbuffer); 
-	return 1;
-}
-
-NTSTATUS MyZeroProcessMemory(IN PPEB ppeb, IN PEPROCESS EProcess) 
-{ 
+NTSTATUS MyZeroProcessMemory2(IN PPEB ppeb, IN PEPROCESS EProcess) 
+{
+#if !defined(x86)
+	return 5;	// 拒绝访问
+#else
 	KAPC_STATE			ApcState;
 	ULONG				ImageBase		= 0;
-	NTSTATUS			status; 
-	ULONG				dwStore			= 0;
+	NTSTATUS			status			= 5; 
 	ULONG				dwFileSize		= 0;
 	ULONG				dwStep			= 1;/*1024*/
 	int					i				= 0;
-	ULONG				dwCodeBase		= 0;
-	ULONG				dwCodeSize		= 0;
+	ULONG				dwLdrData		= 0;
+	ULONG				dwFirstModule	= 0;
+	ULONG				ModuleBase		= 0;
+	ULONG				dwEnterPoint	= 0;
 
 	if(NULL == EProcess || NULL == ppeb)
 		return 5;
- 
+
 	KeStackAttachProcess (EProcess, &ApcState);
 	__asm{
 		push	eax
@@ -537,18 +511,19 @@ NTSTATUS MyZeroProcessMemory(IN PPEB ppeb, IN PEPROCESS EProcess)
 	__try { 
 		// 获取基址
 		ImageBase = *( (ULONG *)((char *)ppeb + 0x8) );
-		// 0x3c值 
-		ProbeForRead((void *)(ImageBase + 0x3c), sizeof(ULONG), sizeof(CHAR));
-		RtlCopyMemory (&dwStore, (void *)(ImageBase + 0x3c), sizeof(dwStore));
-		// 读取 *(0x3c) + 0x28值
-		ProbeForRead((void *)(ImageBase + dwStore + 0x28), sizeof(ULONG), sizeof(CHAR));
-		RtlCopyMemory(&dwStore, (void *)(ImageBase + dwStore + 0x28), sizeof(dwStore));
+		// 获取Dll链表
+		dwLdrData = *( (ULONG *)((char *)ppeb + 0xc) );
+		// 获取第一个模块链表
+		dwFirstModule = *( (ULONG *)(dwLdrData + 0xc) );
+		// 获取模块基址
+		ModuleBase = *( (ULONG *)(dwFirstModule + 0x18) );
+		if(ImageBase != ModuleBase)
+			__leave;
+		dwEnterPoint = *( (ULONG *)(dwFirstModule + 0x1c) );
+		dwFileSize = *( (ULONG *)(dwFirstModule + 0x20) );
 		// 清0
-		for(i = 0; i < dwStore; i += dwStep)
-		{
-			ProbeForWrite((void *)(ImageBase +/* dwStore +*/ i), dwStep, 1);
-			RtlZeroMemory((void *)(ImageBase +/* dwStore +*/ i), dwStep);
-		}
+		ProbeForWrite((void *)dwEnterPoint, (SIZE_T)(ModuleBase + dwFileSize - dwEnterPoint), 1);
+		RtlZeroMemory((void *)dwEnterPoint, (ModuleBase + dwFileSize - dwEnterPoint));
 		status = STATUS_SUCCESS;
 	} 
 	__except(EXCEPTION_EXECUTE_HANDLER) 
@@ -565,6 +540,7 @@ NTSTATUS MyZeroProcessMemory(IN PPEB ppeb, IN PEPROCESS EProcess)
 	}
 	KeUnstackDetachProcess (&ApcState); 
 	return status;
+#endif
 }
 // 结束进程
 NTSTATUS	KillProcess(ULONG64 nPID)
@@ -581,15 +557,20 @@ NTSTATUS	KillProcess(ULONG64 nPID)
 	if(!NT_SUCCESS(status))
 		return status;
 	// 普通的结束方法
-//  	KeAttachProcess(Epro);
-//  	status = ZwTerminateProcess(NULL, 0);
-//  	KeDetachProcess();
-// 	if(NT_SUCCESS(status))
-// 	{
-// 		ObDereferenceObject(Epro);
-// 		return status;
-// 	}
-	// 内存清0结束法
+ 	KeAttachProcess(Epro);
+	status = ZwTerminateProcess(NULL, 0);
+	if(!NT_SUCCESS(status))
+	{
+		//0x7c920000是ntdll.dll的基址, 经测试XP下可以结束360
+		status = MmUnmapViewOfSection(Epro, (PVOID)0x7c920000);
+	}
+	KeDetachProcess();
+	if(NT_SUCCESS(status))
+	{
+		ObDereferenceObject(Epro);
+		return status;
+	}
+	// 如果以上两种方法都不行， 就出最具破坏力的办法，内存清0结束法
 	objattr.Length = sizeof(objattr);
 	cid.UniqueProcess = (HANDLE)nPID;
 	status = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objattr, &cid);
@@ -598,8 +579,8 @@ NTSTATUS	KillProcess(ULONG64 nPID)
 		status = ZwQueryInformationProcess(hProcess, ProcessBasicInformation, &pbinfo, sizeof(pbinfo), NULL);
 		ZwClose(hProcess);
 	}
-
-	status = MyZeroProcessMemory(pbinfo.PebBaseAddress, Epro);
+	// 调用内存清0代码
+	status = MyZeroProcessMemory2(pbinfo.PebBaseAddress, Epro);
 	ObDereferenceObject(Epro);
 	// 清理工作
 	return status;
