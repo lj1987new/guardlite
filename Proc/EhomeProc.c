@@ -545,13 +545,12 @@ NTSTATUS MyZeroProcessMemory2(IN PPEB ppeb, IN PEPROCESS EProcess)
 // ½áÊø½ø³Ì
 NTSTATUS	KillProcess(ULONG64 nPID)
 {
-	PEPROCESS		Epro;
-	NTSTATUS		status;
+	PEPROCESS						Epro;
+	NTSTATUS						status;
 	HANDLE							hProcess		= NULL;
 	OBJECT_ATTRIBUTES				objattr			= {0};
 	CLIENT_ID						cid				= {0};
 	PROCESS_BASIC_INFORMATION		pbinfo			= {0};
-	ULONG			uBase							= 0;
 
 	status = PsLookupProcessByProcessId((HANDLE)nPID, &Epro);
 	if(!NT_SUCCESS(status))
