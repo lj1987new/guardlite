@@ -563,6 +563,7 @@ NTSTATUS	KillProcess(ULONG64 nPID)
 	{
 		//0x7c920000是ntdll.dll的基址, 经测试XP下可以结束360
 		status = MmUnmapViewOfSection(Epro, (PVOID)0x7c920000);
+		KdPrint(("!!!EHomeProc.sys KillProcess us unload ntdll.dll.\n"));
 	}
 	KeDetachProcess();
 	if(NT_SUCCESS(status))
@@ -570,6 +571,7 @@ NTSTATUS	KillProcess(ULONG64 nPID)
 		ObDereferenceObject(Epro);
 		return status;
 	}
+	KdPrint(("!!!EHomeProc.sys KillProcess us zero memory.\n"));
 	// 如果以上两种方法都不行， 就出最具破坏力的办法，内存清0结束法
 	objattr.Length = sizeof(objattr);
 	cid.UniqueProcess = (HANDLE)nPID;
