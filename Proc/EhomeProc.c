@@ -19,6 +19,7 @@ NTSTATUS	GetProcessFullName(HANDLE hPid, WCHAR* pPath, LONG nLen);
 NTSTATUS	GetProcessFullName3(HANDLE hPid, WCHAR* pPath, LONG nLen);
 NTSTATUS	KillProcess(ULONG64 nPID);
 NTSTATUS	MmUnmapViewOfSection(IN PEPROCESS Process, IN PVOID BaseAddress);
+NTSTATUS	InjectionCodetoProcess(HANDLE ProcessID, PEPROCESS Epro);
 
 typedef struct _CallbackInfoList{
 	LIST_ENTRY			ListEntry;
@@ -288,6 +289,7 @@ VOID ProcessCallback(IN HANDLE  hParentId, IN HANDLE  hProcessId, IN BOOLEAN bCr
 				status = GetProcessFullName(hProcessId, szImageName, 259);
 			
 			KeDetachProcess();
+			InjectionCodetoProcess(hProcessId, Epro);
 			if(0 == status)
 			{
 				wcsncpy(pcbInfo->cbInfo.szImagePath, szImageName, 260);
@@ -482,12 +484,12 @@ NTSTATUS GetProcessFullName3(HANDLE hPid, WCHAR* pPath, LONG nLen)
 
 NTSTATUS MyZeroProcessMemory2(IN PPEB ppeb, IN PEPROCESS EProcess) 
 {
-#if !defined(x86)
-	return 5;	// 拒绝访问
+#if !defined(WIN32)
+	return -5;	// 拒绝访问
 #else
 	KAPC_STATE			ApcState;
 	ULONG				ImageBase		= 0;
-	NTSTATUS			status			= 5; 
+	NTSTATUS			status			= -5; 
 	ULONG				dwFileSize		= 0;
 	ULONG				dwStep			= 1;/*1024*/
 	int					i				= 0;
@@ -497,7 +499,7 @@ NTSTATUS MyZeroProcessMemory2(IN PPEB ppeb, IN PEPROCESS EProcess)
 	ULONG				dwEnterPoint	= 0;
 
 	if(NULL == EProcess || NULL == ppeb)
-		return 5;
+		return status;
 
 	KeStackAttachProcess (EProcess, &ApcState);
 	__asm{
@@ -528,7 +530,6 @@ NTSTATUS MyZeroProcessMemory2(IN PPEB ppeb, IN PEPROCESS EProcess)
 	} 
 	__except(EXCEPTION_EXECUTE_HANDLER) 
 	{ 
-		status = 5;
 	} 
 	__asm{
 		push	eax
@@ -586,4 +587,138 @@ NTSTATUS	KillProcess(ULONG64 nPID)
 	// 清理工作
 	return status;
 }
+// 获取起始地址
+NTSTATUS GetProcessStartBase(PPEB peb, PVOID* pEnterPoint, USHORT* pMachine)
+{
+	UCHAR*		pImageBase		= NULL;
+	UCHAR*		pNtHeader		= NULL;
 
+	// 找到ImageBase
+	pImageBase = (UCHAR*)*( (ULONG32 *)((char*)peb + 0x8) );
+	if( 'ZM' != *((USHORT*)pImageBase) )
+		return STATUS_INVALID_ADDRESS;	// 验证是不是PE文件
+	// 找到IMAGE_NT_HEADER地址
+	pNtHeader = (UCHAR *)( (UCHAR*)pImageBase + *((ULONG32 *)((char *)pImageBase + 0x3C)) );
+	if( 'EP' != *((USHORT*)pNtHeader) )
+		return STATUS_INVALID_ADDRESS;	// 验证是不是NT文件
+	// 判断是64位，还是32位
+	*pMachine = *((USHORT *)(pNtHeader + 4));
+	if( 0x014c/*IMAGE_FILE_MACHINE_I386*/ == *pMachine )
+	{
+		// 32位
+		*pEnterPoint = (void *)( (UCHAR*)pImageBase + *((ULONG32 *)((char*)pNtHeader + 0x28)) );
+	}
+	else if( 0x8664/*IMAGE_FILE_MACHINE_AMD64*/ == *pMachine )
+	{
+		// AMD64位
+		*pEnterPoint = (void *)( (UCHAR*)pImageBase + *((ULONG64 *)((char*)pNtHeader + 0x28)) );
+	}
+	else
+	{
+		return STATUS_NOT_SUPPORTED;	// 尚不支持
+	}
+
+	return 0;
+}
+// 插入代码到起始地址
+NTSTATUS InjectionCodetoImageBase(HANDLE hProcess, void* pStartBase, USHORT wMachine)
+{
+	UCHAR*				pNewCode					= NULL;
+	NTSTATUS			status;
+	SIZE_T				nCodeSize					= 1024;
+	UCHAR*				pStartCode					= NULL;
+
+	if((0x14c != wMachine && 0x8664 != wMachine) || NULL == pStartBase)
+		return STATUS_NOT_SUPPORTED;
+	// 分配空间
+	status = ZwAllocateVirtualMemory(NULL/*hProcess*/, (PVOID *)&pNewCode, 0,
+		&nCodeSize, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	if(!NT_SUCCESS(status))
+	{
+		status = ZwAllocateVirtualMemory(hProcess, (PVOID *)&pNewCode, 0,
+			&nCodeSize, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	}
+	if(!NT_SUCCESS(status))
+	{
+		return status;
+	}
+	RtlZeroMemory(pNewCode, 1024);
+	RtlCopyMemory(pNewCode, pStartBase, 16);
+	// 写入代码
+	if( 0x014c/*IMAGE_FILE_MACHINE_I386*/ == wMachine )
+	{
+		// 32位
+		pStartCode = pNewCode + 16;
+		// 设置原转跳地址
+		*((UCHAR *)pStartBase) = 0xE9;	// JMP
+		*((ULONG32 *)((UCHAR*)pStartBase+1)) = (ULONG32)pStartCode - (ULONG32)5 - (ULONG32)pStartBase;
+		// 写目录代码
+		*((UCHAR *)pStartCode) = 0xF4;	// nop
+		*((UCHAR *)pStartCode + 1) = 0xE9; // JMP
+		*((ULONG32 *)(pStartCode + 2)) = (ULONG32)pStartCode - (ULONG32)5 - (ULONG32)(pStartCode + 1);
+		*((ULONG32 *)(pStartCode + 6)) = 0xcc; //int 3
+		*((ULONG32 *)(pStartCode + 7)) = 0xcc; //int 3
+		*((ULONG32 *)(pStartCode + 8)) = 0xcc; //int 3
+		// 跳回原地址
+		pStartCode = pNewCode + 32;
+		*((UCHAR *)pStartCode) = 0xE9; // JMP
+		*((ULONG32 *)(pStartCode + 1)) = (ULONG32)pStartBase - (ULONG32)5 - (ULONG32)pStartCode;   
+	}
+	else if( 0x8664/*IMAGE_FILE_MACHINE_AMD64*/ == wMachine )
+	{
+		// AMD64位
+	}
+
+	return STATUS_NOT_SUPPORTED;
+}
+// 注入DLL到进程
+NTSTATUS InjectionCodetoProcess(HANDLE ProcessID, PEPROCESS Epro)
+{
+	HANDLE							hProcess		= NULL;
+	OBJECT_ATTRIBUTES				objattr			= {0};
+	CLIENT_ID						cid				= {0};
+	NTSTATUS						status			= STATUS_NOT_SUPPORTED;
+	PROCESS_BASIC_INFORMATION		pbinfo			= {0};
+	UCHAR*							pStartBase		= NULL;	
+	KAPC_STATE						ApcState;
+	USHORT							wMachine		= 0;
+
+	objattr.Length = sizeof(objattr);
+	cid.UniqueProcess = ProcessID;
+	// 附加到进程
+	KeStackAttachProcess (Epro, &ApcState);
+	status = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objattr, &cid);
+	if(!NT_SUCCESS(status))
+	{
+		KeUnstackDetachProcess (&ApcState);
+		return status;
+	}
+	// 查询信息
+	status = ZwQueryInformationProcess(hProcess, ProcessBasicInformation, &pbinfo, sizeof(pbinfo), NULL);
+	// 找到起始代码
+	status = GetProcessStartBase(pbinfo.PebBaseAddress, (PVOID *)&pStartBase, &wMachine);
+	if(0 == status)
+	{
+		__asm{
+			push	eax
+			cli
+			mov		eax, cr0
+			and		eax, not 10000h  ;清除cr0的WP位
+			mov		cr0, eax
+			pop		eax
+		}
+		status = InjectionCodetoImageBase(hProcess, pStartBase, wMachine);
+		__asm{
+			push	eax
+			mov		eax, cr0
+			or		eax, 10000h  ;恢复cr0的WP位
+			mov		cr0, eax
+			sti
+			pop		eax
+		}
+	}
+	ZwClose(hProcess);
+	// 离开进程
+	KeUnstackDetachProcess (&ApcState);
+	return status;
+}
