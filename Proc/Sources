@@ -2,7 +2,11 @@ TARGETNAME=EhomeProc
 TARGETPATH=F:\Out\Bin\EhomeDriver
 TARGETTYPE=DRIVER
 TARGETLIBS=
+!if "$(CPU)" == "x86"
+C_DEFINES= /DWIN32
+!else
 C_DEFINES=
+!endif
 
 SOURCES = EhomeProc.c
 
