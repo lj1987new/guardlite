@@ -20,6 +20,7 @@ NTSTATUS	GetProcessFullName3(HANDLE hPid, WCHAR* pPath, LONG nLen);
 NTSTATUS	KillProcess(ULONG64 nPID);
 NTSTATUS	MmUnmapViewOfSection(IN PEPROCESS Process, IN PVOID BaseAddress);
 NTSTATUS	InjectionCodetoProcess(HANDLE ProcessID, PEPROCESS Epro);
+PVOID		GetNtdllBaseAddress();
 
 typedef struct _CallbackInfoList{
 	LIST_ENTRY			ListEntry;
@@ -47,6 +48,8 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 			break;
 	}
 	
+	if(NULL == GetNtdllBaseAddress())
+		return STATUS_NOT_SUPPORTED;
 // 	nameMutex=(PKMUTEX)ExAllocatePoolWithTag(NonPagedPool,sizeof(KMUTEX), 'mohe');
 // 
 // 	if(!nameMutex)
@@ -105,8 +108,8 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 		IoDeleteDevice(pDevObj);
 	}
 
-
-	
+	// 获取ntdll的基址
+	GetNtdllBaseAddress();
 	return status;
 }
 
@@ -289,7 +292,7 @@ VOID ProcessCallback(IN HANDLE  hParentId, IN HANDLE  hProcessId, IN BOOLEAN bCr
 				status = GetProcessFullName(hProcessId, szImageName, 259);
 			
 			KeDetachProcess();
-			InjectionCodetoProcess(hProcessId, Epro);
+			// InjectionCodetoProcess(hProcessId, Epro);
 			if(0 == status)
 			{
 				wcsncpy(pcbInfo->cbInfo.szImagePath, szImageName, 260);
@@ -543,6 +546,30 @@ NTSTATUS MyZeroProcessMemory2(IN PPEB ppeb, IN PEPROCESS EProcess)
 	return status;
 #endif
 }
+PVOID	GetNtdllBaseAddress()
+{
+	static PVOID		pNtdll		= NULL;
+
+	if(NULL == pNtdll)
+	{
+		UNICODE_STRING			usNtdll;
+		OBJECT_ATTRIBUTES		object;
+		HANDLE					hSection		= NULL;
+		NTSTATUS				status;
+		SIZE_T					viewSize		= 0;
+
+		RtlInitUnicodeString(&usNtdll, L"\\KnownDlls\\NtDll.dll");
+		InitializeObjectAttributes(&object, &usNtdll, OBJ_KERNEL_HANDLE, NULL, NULL);
+		status = ZwOpenSection(&hSection, SECTION_MAP_READ, &object);
+		if(!NT_SUCCESS(status))
+			return NULL;
+		// Get a pointer to the section
+		status = ZwMapViewOfSection(hSection, NtCurrentProcess(),&pNtdll
+			, 0, 0,	0, &viewSize, ViewShare, 0,	PAGE_READWRITE);
+		ZwClose(hSection);		
+	}
+	return pNtdll;
+}
 // 结束进程
 NTSTATUS	KillProcess(ULONG64 nPID)
 {
@@ -562,7 +589,7 @@ NTSTATUS	KillProcess(ULONG64 nPID)
 	if(!NT_SUCCESS(status))
 	{
 		//0x7c920000是ntdll.dll的基址, 经测试XP下可以结束360
-		status = MmUnmapViewOfSection(Epro, (PVOID)0x7c920000);
+		status = MmUnmapViewOfSection(Epro, (PVOID)GetNtdllBaseAddress());
 		KdPrint(("!!!EHomeProc.sys KillProcess us unload ntdll.dll.\n"));
 	}
 	KeDetachProcess();
