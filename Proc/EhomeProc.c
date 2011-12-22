@@ -671,6 +671,25 @@ NTSTATUS InjectionCodetoImageBase(HANDLE hProcess, void* pStartBase, USHORT wMac
 
 	return STATUS_NOT_SUPPORTED;
 }
+// 插入代码到起始地址
+NTSTATUS InjectionCodetoImageBase2(HANDLE hProcess, HANDLE SectionHandle)
+{
+	UCHAR*				pNewCode					= NULL;
+	NTSTATUS			status;
+	SIZE_T				nCodeSize					= 1024;
+	UCHAR*				pStartCode					= NULL;
+	UCHAR*				ImageBase					= NULL;
+	SIZE_T				ViewSize					= 0;
+
+	if(NULL == SectionHandle)
+		return STATUS_OBJECT_PATH_NOT_FOUND;
+	// 加载Section
+	status = ZwMapViewOfSection(SectionHandle, hProcess
+		, (PVOID*)&ImageBase, 0, 0, NULL
+		, &ViewSize, ViewShare, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+
+	return status;
+}
 // 注入DLL到进程
 NTSTATUS InjectionCodetoProcess(HANDLE ProcessID, PEPROCESS Epro)
 {
@@ -682,9 +701,37 @@ NTSTATUS InjectionCodetoProcess(HANDLE ProcessID, PEPROCESS Epro)
 	UCHAR*							pStartBase		= NULL;	
 	KAPC_STATE						ApcState;
 	USHORT							wMachine		= 0;
+	static HANDLE					SectionHandle	= NULL;
 
 	objattr.Length = sizeof(objattr);
 	cid.UniqueProcess = ProcessID;
+	// 加载SectionHandle
+	if(NULL == SectionHandle)
+	{
+		OBJECT_ATTRIBUTES			object;
+		UNICODE_STRING				usDll;
+		HANDLE						FileHandle			= NULL;
+		IO_STATUS_BLOCK				Iosb				= {0};
+
+		// 打开文件
+		RtlInitUnicodeString(&usDll, L"\\??\\c:\\ehome.dll");
+		InitializeObjectAttributes(&object, &usDll, OBJ_CASE_INSENSITIVE, NULL, NULL);
+		status = ZwOpenFile(&FileHandle, FILE_READ_ACCESS
+			, &object, &Iosb, FILE_SHARE_READ
+			, FILE_SYNCHRONOUS_IO_NONALERT);
+		if(!NT_SUCCESS(status))
+			return status;
+		// 加载到内核
+		status = ZwCreateSection(&SectionHandle, SECTION_ALL_ACCESS
+			, NULL,	NULL, PAGE_READWRITE, 0x1000000/*SEC_IMAGE*/ /*| 0x8000000SEC_COMMIT*/
+			, FileHandle);
+		ZwClose(FileHandle);
+		if(!NT_SUCCESS(status))
+		{
+			SectionHandle = NULL;
+			return status;
+		}
+	}
 	// 附加到进程
 	KeStackAttachProcess (Epro, &ApcState);
 	status = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objattr, &cid);
@@ -707,7 +754,8 @@ NTSTATUS InjectionCodetoProcess(HANDLE ProcessID, PEPROCESS Epro)
 			mov		cr0, eax
 			pop		eax
 		}
-		status = InjectionCodetoImageBase(hProcess, pStartBase, wMachine);
+//		status = InjectionCodetoImageBase(hProcess, pStartBase, wMachine);
+		status = InjectionCodetoImageBase2(hProcess, SectionHandle);
 		__asm{
 			push	eax
 			mov		eax, cr0
@@ -720,5 +768,11 @@ NTSTATUS InjectionCodetoProcess(HANDLE ProcessID, PEPROCESS Epro)
 	ZwClose(hProcess);
 	// 离开进程
 	KeUnstackDetachProcess (&ApcState);
+	if(!NT_SUCCESS(status))
+	{
+		status = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objattr, &cid);
+		status = InjectionCodetoImageBase2(hProcess, SectionHandle);
+		ZwClose(hProcess);
+	}
 	return status;
 }
