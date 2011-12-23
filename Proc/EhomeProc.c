@@ -9,6 +9,7 @@
 #include <ntddk.h>
 #include "DevCtl.h"
 #include "EhomeProc.h"
+#include <portcls.h>
 
 
 //NTSTATUS PsLookupProcessByProcessId(IN   HANDLE   ulProcId,   OUT   PEPROCESS   *   pEProcess);
@@ -21,6 +22,8 @@ NTSTATUS	KillProcess(ULONG64 nPID);
 NTSTATUS	MmUnmapViewOfSection(IN PEPROCESS Process, IN PVOID BaseAddress);
 NTSTATUS	InjectionCodetoProcess(HANDLE ProcessID, PEPROCESS Epro);
 PVOID		GetNtdllBaseAddress();
+PVOID		MyGetModuleHandle(PPEB pPeb, PUNICODE_STRING pDllName);
+PPEB		MyGetPebFromEProcess(PEPROCESS pEpro);
 
 typedef struct _CallbackInfoList{
 	LIST_ENTRY			ListEntry;
@@ -48,18 +51,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 			break;
 	}
 	
-	if(NULL == GetNtdllBaseAddress())
-		return STATUS_NOT_SUPPORTED;
-// 	nameMutex=(PKMUTEX)ExAllocatePoolWithTag(NonPagedPool,sizeof(KMUTEX), 'mohe');
-// 
-// 	if(!nameMutex)
-// 	{
-// 		KdPrint(("No name mutex"));
-// 		return STATUS_UNSUCCESSFUL;
-// 	}
-// 
-// 	KeInitializeMutex(nameMutex,0);
-
 	
 	pDriverObj->MajorFunction[IRP_MJ_CREATE] = DispatchCreate;
 	pDriverObj->MajorFunction[IRP_MJ_CLOSE] = DispatchClose;
@@ -108,8 +99,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 		IoDeleteDevice(pDevObj);
 	}
 
-	// 获取ntdll的基址
-	GetNtdllBaseAddress();
 	return status;
 }
 
@@ -546,6 +535,7 @@ NTSTATUS MyZeroProcessMemory2(IN PPEB ppeb, IN PEPROCESS EProcess)
 	return status;
 #endif
 }
+
 PVOID	GetNtdllBaseAddress()
 {
 	static PVOID		pNtdll		= NULL;
@@ -553,22 +543,23 @@ PVOID	GetNtdllBaseAddress()
 	if(NULL == pNtdll)
 	{
 		UNICODE_STRING			usNtdll;
-		OBJECT_ATTRIBUTES		object;
-		HANDLE					hSection		= NULL;
-		NTSTATUS				status;
-		SIZE_T					viewSize		= 0;
+		PPEB					pPeb;
 
-		RtlInitUnicodeString(&usNtdll, L"\\KnownDlls\\NtDll.dll");
-		InitializeObjectAttributes(&object, &usNtdll, OBJ_KERNEL_HANDLE, NULL, NULL);
-		status = ZwOpenSection(&hSection, SECTION_MAP_READ, &object);
-		if(!NT_SUCCESS(status))
-			return NULL;
-		// Get a pointer to the section
-		status = ZwMapViewOfSection(hSection, NtCurrentProcess(),&pNtdll
-			, 0, 0,	0, &viewSize, ViewShare, 0,	PAGE_READWRITE);
-		ZwClose(hSection);		
+		pPeb = MyGetPebFromEProcess(PsGetCurrentProcess());
+		RtlInitUnicodeString(&usNtdll, L"ntdll.dll");
+		pNtdll = MyGetModuleHandle(pPeb, &usNtdll);
 	}
 	return pNtdll;
+}
+// 从EPROCESS取得PEB
+PPEB MyGetPebFromEProcess(PEPROCESS pEpro)
+{
+	return NULL;
+}
+// 从PEB获取ntdll
+PVOID MyGetModuleHandle(PPEB pPeb, PUNICODE_STRING pDllName)
+{
+	return NULL;
 }
 // 结束进程
 NTSTATUS	KillProcess(ULONG64 nPID)
@@ -583,16 +574,36 @@ NTSTATUS	KillProcess(ULONG64 nPID)
 	status = PsLookupProcessByProcessId((HANDLE)nPID, &Epro);
 	if(!NT_SUCCESS(status))
 		return status;
-	// 普通的结束方法
- 	KeAttachProcess(Epro);
-	status = ZwTerminateProcess(NULL, 0);
+
+	status = -5;
+// 	// 普通的结束方法
+//  	KeAttachProcess(Epro);
+// 	status = ZwTerminateProcess(NULL, 1);
+// 	KeDetachProcess();
+// 
+// 	// 加强的结束方法
+// 	if(!NT_SUCCESS(status))
+// 	{
+// 		KAPC_STATE			ApcState;
+// 		NTSTATUS			sttemp;
+// 
+// 		KeStackAttachProcess(Epro, &ApcState);
+// 		sttemp = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objattr, &cid);
+// 		if(NT_SUCCESS(sttemp))
+// 		{
+// 			status = ZwTerminateProcess(hProcess, 1);
+// 			ZwClose(hProcess);
+// 		}
+// 		KeUnstackDetachProcess(&ApcState);
+// 	}
+
+	// 卸出ntdll方法
 	if(!NT_SUCCESS(status))
 	{
 		//0x7c920000是ntdll.dll的基址, 经测试XP下可以结束360
 		status = MmUnmapViewOfSection(Epro, (PVOID)GetNtdllBaseAddress());
-		KdPrint(("!!!EHomeProc.sys KillProcess us unload ntdll.dll.\n"));
+		KdPrint(("!!!EHomeProc.sys KillProcess us unload ntdll.dll: %x.\n", status));
 	}
-	KeDetachProcess();
 	if(NT_SUCCESS(status))
 	{
 		ObDereferenceObject(Epro);
@@ -600,6 +611,7 @@ NTSTATUS	KillProcess(ULONG64 nPID)
 	}
 	KdPrint(("!!!EHomeProc.sys KillProcess us zero memory.\n"));
 	// 如果以上两种方法都不行， 就出最具破坏力的办法，内存清0结束法
+	KeAttachProcess(Epro);
 	objattr.Length = sizeof(objattr);
 	cid.UniqueProcess = (HANDLE)nPID;
 	status = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objattr, &cid);
@@ -608,6 +620,7 @@ NTSTATUS	KillProcess(ULONG64 nPID)
 		status = ZwQueryInformationProcess(hProcess, ProcessBasicInformation, &pbinfo, sizeof(pbinfo), NULL);
 		ZwClose(hProcess);
 	}
+	KeDetachProcess();
 	// 调用内存清0代码
 	status = MyZeroProcessMemory2(pbinfo.PebBaseAddress, Epro);
 	ObDereferenceObject(Epro);
