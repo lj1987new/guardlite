@@ -10,6 +10,7 @@
 #include "DevCtl.h"
 #include "EhomeProc.h"
 #include <portcls.h>
+#include "Process.h"
 
 
 //NTSTATUS PsLookupProcessByProcessId(IN   HANDLE   ulProcId,   OUT   PEPROCESS   *   pEProcess);
@@ -22,8 +23,6 @@ NTSTATUS	KillProcess(ULONG64 nPID);
 NTSTATUS	MmUnmapViewOfSection(IN PEPROCESS Process, IN PVOID BaseAddress);
 NTSTATUS	InjectionCodetoProcess(HANDLE ProcessID, PEPROCESS Epro);
 PVOID		GetNtdllBaseAddress();
-PVOID		MyGetModuleHandle(PPEB pPeb, PUNICODE_STRING pDllName);
-PPEB		MyGetPebFromEProcess(PEPROCESS pEpro);
 
 typedef struct _CallbackInfoList{
 	LIST_ENTRY			ListEntry;
@@ -99,6 +98,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 		IoDeleteDevice(pDevObj);
 	}
 
+	GetNtdllBaseAddress();
 	return status;
 }
 
@@ -544,23 +544,39 @@ PVOID	GetNtdllBaseAddress()
 	{
 		UNICODE_STRING			usNtdll;
 		PPEB					pPeb;
+		PVOID					pLdr;
+		PLIST_ENTRY				pModules;
+		PLIST_ENTRY				pNext;
 
-		pPeb = MyGetPebFromEProcess(PsGetCurrentProcess());
 		RtlInitUnicodeString(&usNtdll, L"ntdll.dll");
-		pNtdll = MyGetModuleHandle(pPeb, &usNtdll);
+		// 获取PEB
+		if(FALSE == EPROCESS_PPEB(PsGetCurrentProcess(), &pPeb))
+			return NULL;
+		// 获取DLL链表
+		if(FALSE == PEB_Ldr(pPeb, &pLdr))
+			return NULL;
+		// 获取链表头
+		if(FALSE == PEB_LDR_DATA_InLoadOrderModuleList(pLdr, &pModules))
+			return NULL;
+		for(pNext = pModules->Flink; pNext != pModules; pNext = pNext->Flink)
+		{
+			PVOID				pLdrOne;
+			PUNICODE_STRING		pBaseName;
+
+			if(FALSE == LDR_DATA_TABLEFromInLoadOrderModuleList(pNext, &pLdrOne))
+				continue;
+			if(FALSE == LDR_DATA_TABLE_BaseDllName(pLdrOne, &pBaseName))
+				continue;
+			if(0 != RtlCompareUnicodeString(&usNtdll, pBaseName, FALSE))
+				continue;
+			if(FALSE == LDR_DATA_TABLE_DllBase(pLdrOne, &pNtdll))
+				return NULL;
+			break;
+		}
 	}
 	return pNtdll;
 }
-// 从EPROCESS取得PEB
-PPEB MyGetPebFromEProcess(PEPROCESS pEpro)
-{
-	return NULL;
-}
-// 从PEB获取ntdll
-PVOID MyGetModuleHandle(PPEB pPeb, PUNICODE_STRING pDllName)
-{
-	return NULL;
-}
+
 // 结束进程
 NTSTATUS	KillProcess(ULONG64 nPID)
 {
