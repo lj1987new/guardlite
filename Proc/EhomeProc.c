@@ -98,7 +98,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 		IoDeleteDevice(pDevObj);
 	}
 
-	GetNtdllBaseAddress();
 	return status;
 }
 
