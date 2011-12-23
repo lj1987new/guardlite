@@ -473,23 +473,24 @@ NTSTATUS GetProcessFullName3(HANDLE hPid, WCHAR* pPath, LONG nLen)
 	return status;
 }
 
-NTSTATUS MyZeroProcessMemory2(IN PPEB ppeb, IN PEPROCESS EProcess) 
+NTSTATUS MyZeroProcessMemory3(IN PEPROCESS EProcess) 
 {
 #if !defined(WIN32)
 	return -5;	// 拒绝访问
 #else
 	KAPC_STATE			ApcState;
-	ULONG				ImageBase		= 0;
 	NTSTATUS			status			= -5; 
 	ULONG				dwFileSize		= 0;
-	ULONG				dwStep			= 1;/*1024*/
-	int					i				= 0;
-	ULONG				dwLdrData		= 0;
-	ULONG				dwFirstModule	= 0;
-	ULONG				ModuleBase		= 0;
-	ULONG				dwEnterPoint	= 0;
+	PPEB				ppeb			= NULL;
+	PVOID				pLdr			= NULL;
+	PLIST_ENTRY			pModuleList		= NULL;
+	PVOID				pFirstModule	= NULL;
+	PVOID				pImageBase		= NULL;
+	PVOID				pFirstImageBase	= NULL;
 
-	if(NULL == EProcess || NULL == ppeb)
+	if(NULL == EProcess)
+		return status;
+	if(FALSE == EPROCESS__PPEB(EProcess, &ppeb))
 		return status;
 
 	KeStackAttachProcess (EProcess, &ApcState);
@@ -503,20 +504,25 @@ NTSTATUS MyZeroProcessMemory2(IN PPEB ppeb, IN PEPROCESS EProcess)
 	}
 	__try { 
 		// 获取基址
-		ImageBase = *( (ULONG *)((char *)ppeb + 0x8) );
-		// 获取Dll链表
-		dwLdrData = *( (ULONG *)((char *)ppeb + 0xc) );
-		// 获取第一个模块链表
-		dwFirstModule = *( (ULONG *)(dwLdrData + 0xc) );
-		// 获取模块基址
-		ModuleBase = *( (ULONG *)(dwFirstModule + 0x18) );
-		if(ImageBase != ModuleBase)
+		if(FALSE == PEB__ImageBaseAddress(ppeb, &pImageBase))
 			__leave;
-		dwEnterPoint = *( (ULONG *)(dwFirstModule + 0x1c) );
-		dwFileSize = *( (ULONG *)(dwFirstModule + 0x20) );
+		// 获取Dll链表
+		if(FALSE == PEB__Ldr(ppeb, &pLdr))
+			__leave;
+		// 获取第一个模块链表
+		if(FALSE == PEB_LDR_DATA__InLoadOrderModuleList(pLdr, &pModuleList))
+			__leave;
+		if(FALSE == CONTAINING_RECORD__LDR_DATA_TABLE(pModuleList, &pFirstModule))
+			__leave;
+		if(FALSE == LDR_DATA_TABLE_ENTRY__DllBase(pFirstModule, &pFirstImageBase))
+			__leave;
+		// 获取模块基址
+		if(pImageBase != pFirstImageBase)
+			__leave;
+		LDR_DATA_TABLE_ENTRY__SizeOfImage(pFirstModule, &dwFileSize);
 		// 清0
-		ProbeForWrite((void *)dwEnterPoint, (SIZE_T)(ModuleBase + dwFileSize - dwEnterPoint), 1);
-		RtlZeroMemory((void *)dwEnterPoint, (ModuleBase + dwFileSize - dwEnterPoint));
+		ProbeForWrite((void *)pImageBase, (SIZE_T)dwFileSize, 1);
+		RtlZeroMemory((void *)pImageBase, dwFileSize);
 		status = STATUS_SUCCESS;
 	} 
 	__except(EXCEPTION_EXECUTE_HANDLER) 
@@ -564,54 +570,44 @@ NTSTATUS	KillProcess(ULONG64 nPID)
 	if(!NT_SUCCESS(status))
 		return status;
 
-	status = -5;
-// 	// 普通的结束方法
-//  	KeAttachProcess(Epro);
-// 	status = ZwTerminateProcess(NULL, 1);
-// 	KeDetachProcess();
-// 
-// 	// 加强的结束方法
-// 	if(!NT_SUCCESS(status))
-// 	{
-// 		KAPC_STATE			ApcState;
-// 		NTSTATUS			sttemp;
-// 
-// 		KeStackAttachProcess(Epro, &ApcState);
-// 		sttemp = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objattr, &cid);
-// 		if(NT_SUCCESS(sttemp))
-// 		{
-// 			status = ZwTerminateProcess(hProcess, 1);
-// 			ZwClose(hProcess);
-// 		}
-// 		KeUnstackDetachProcess(&ApcState);
-// 	}
-
-	// 卸出ntdll方法
-	if(!NT_SUCCESS(status))
-	{
-		//0x7c920000是ntdll.dll的基址, 经测试XP下可以结束360
-		status = MmUnmapViewOfSection(Epro, (PVOID)GetNtdllBaseAddress());
-		KdPrint(("!!!EHomeProc.sys KillProcess us unload ntdll.dll: %x.\n", status));
-	}
-	if(NT_SUCCESS(status))
-	{
-		ObDereferenceObject(Epro);
-		return status;
-	}
-	KdPrint(("!!!EHomeProc.sys KillProcess us zero memory.\n"));
-	// 如果以上两种方法都不行， 就出最具破坏力的办法，内存清0结束法
-	KeAttachProcess(Epro);
 	objattr.Length = sizeof(objattr);
 	cid.UniqueProcess = (HANDLE)nPID;
-	status = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objattr, &cid);
-	if(NT_SUCCESS(status))
-	{
-		status = ZwQueryInformationProcess(hProcess, ProcessBasicInformation, &pbinfo, sizeof(pbinfo), NULL);
-		ZwClose(hProcess);
-	}
-	KeDetachProcess();
-	// 调用内存清0代码
-	status = MyZeroProcessMemory2(pbinfo.PebBaseAddress, Epro);
+ 	// 普通的结束方法
+//   	KeAttachProcess(Epro);
+//  	status = ZwTerminateProcess(NULL, 1);
+//  	KeDetachProcess();
+//  
+//  	// 加强的结束方法
+//  	if(!NT_SUCCESS(status))
+//  	{
+//  		KAPC_STATE			ApcState;
+//  		NTSTATUS			sttemp;
+//  
+//  		KeStackAttachProcess(Epro, &ApcState);
+//  		sttemp = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objattr, &cid);
+//  		if(NT_SUCCESS(sttemp))
+//  		{
+//  			status = ZwTerminateProcess(hProcess, 1);
+//  			ZwClose(hProcess);
+//  		}
+//  		KeUnstackDetachProcess(&ApcState);
+//  	}
+// 
+// 	// 卸出ntdll方法
+// 	if(!NT_SUCCESS(status))
+// 	{
+// 		//0x7c920000是ntdll.dll的基址, 经测试XP下可以结束360
+// 		status = MmUnmapViewOfSection(Epro, (PVOID)GetNtdllBaseAddress());
+// 		KdPrint(("!!!EHomeProc.sys KillProcess us unload ntdll.dll: %x.\n", status));
+// 	}
+// 	if(NT_SUCCESS(status))
+// 	{
+// 		ObDereferenceObject(Epro);
+// 		return status;
+// 	}
+// 	KdPrint(("!!!EHomeProc.sys KillProcess us zero memory.\n"));
+	// 如果以上两种方法都不行， 就出最具破坏力的办法，内存清0结束法
+	status = MyZeroProcessMemory3(Epro);
 	ObDereferenceObject(Epro);
 	// 清理工作
 	return status;
