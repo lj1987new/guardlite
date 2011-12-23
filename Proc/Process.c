@@ -23,6 +23,7 @@ BOOLEAN EPROCESS_PPEB(PEPROCESS pEproc, PPEB* pPeb)
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 		nPos = 0x1B0;
 		break;
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
@@ -42,6 +43,7 @@ BOOLEAN PEB_ImageBaseAddress(PPEB pPeb, PVOID* pBase)
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0x8;
 		break;
@@ -59,6 +61,7 @@ BOOLEAN PEB_Ldr(PPEB pPeb, PVOID* pLdr)
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0xC;
 		break;
@@ -76,6 +79,7 @@ BOOLEAN PEB_ProcessParameters(PPEB pPeb, PVOID* pParam)
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0x10;
 		break;
@@ -93,6 +97,7 @@ BOOLEAN RTL_USER_PROCESS_PARAMETERS_DllPath(PVOID pParam, PUNICODE_STRING* pDllP
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0x30;
 		break;
@@ -110,6 +115,7 @@ BOOLEAN RTL_USER_PROCESS_PARAMETERS_ImagePathName(PVOID pParam, PUNICODE_STRING*
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0x38;
 		break;
@@ -127,6 +133,7 @@ BOOLEAN RTL_USER_PROCESS_PARAMETERS_CommandLine(PVOID pParam, PUNICODE_STRING* p
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0x40;
 		break;
@@ -143,7 +150,8 @@ BOOLEAN PEB_LDR_DATA_InLoadOrderModuleList(PVOID pLdr, PLIST_ENTRY* pEntry)
 
 	switch(GetBuildNumber())
 	{
-	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0xC;
 		break;
@@ -160,6 +168,7 @@ BOOLEAN LDR_DATA_TABLEFromInLoadOrderModuleList(PVOID pInload, PVOID* pLdr)
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0x0;
 		break;
@@ -177,6 +186,7 @@ BOOLEAN LDR_DATA_TABLE_DllBase(PVOID pLdr, PVOID* pBase)
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0x18;
 		break;
@@ -194,6 +204,7 @@ BOOLEAN LDR_DATA_TABLE_EntryPoint(PVOID pLdr, PVOID* pPoint)
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0x1C;
 		break;
@@ -211,6 +222,7 @@ BOOLEAN LDR_DATA_TABLE_SizeOfImage(PVOID pLdr, UINT32* pSize)
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0x20;
 		break;
@@ -228,6 +240,7 @@ BOOLEAN LDR_DATA_TABLE_FullDllName(PVOID pLdr, PUNICODE_STRING* pFullName)
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0x24;
 		break;
@@ -245,6 +258,7 @@ BOOLEAN LDR_DATA_TABLE_BaseDllName(PVOID pLdr, PUNICODE_STRING* pDllName)
 	switch(GetBuildNumber())
 	{
 	case 2195:	// Windows 2000 Kernel Version 2195 (Service Pack 4) UP Free x86 compatible 
+	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0x2C;
 		break;

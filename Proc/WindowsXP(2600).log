@@ -1,0 +1,1108 @@
+WARNING: Inaccessible path: 'F:\WorkSVN\EhomeNet344\bin\i386'
+WARNING: Inaccessible path: 'F:\GoogleCode\Beanstalkapp\VS2005\Driver\TDISimple'
+WARNING: Inaccessible path: 'F:\GoogleCode\Beanstalkapp\VS2005\Driver\FltFilemon'
+WARNING: Inaccessible path: 'F:\WorkSVN\EhomeNet344'
+WARNING: Inaccessible path: 'F:\EhomeSec'
+SXS: BasepCreateActCtx() NtOpenFile(\??\C:\??\C:\WINDOWS\system32\winlogon.exe) failed
+[1324632415.781] VMUpgradeHelperService::GetConfigValue: Getting configuration value "NetConfigRestoreOnStart".
+[1324632416.015] VMUpgradeHelperService::GetConfigValue: Getting configuration value "NetConfigSaveOnStop".
+[1324632416.109] VMUpgradeHelperService::GetConfigValue: Getting configuration value "NetConfigSaveOnShutdown".
+[1324632416.218] VMUpgradeHelperService::GetConfigValue: Getting configuration value "NetConfigSaved".
+Find one ProcEvent: 892, 696, C:\WINDOWS\system32\svchost.exe, 1
+Leave Processcallback
+get one info(0) 892, 696, C:\WINDOWS\system32\svchost.exe, 1
+get info count(1) size: 544:544
+get info count(0) size: 0:544
+Break instruction exception - code 80000003 (first chance)
+*******************************************************************************
+*                                                                             *
+*   You are seeing this message because you pressed either                    *
+*       CTRL+C (if you run kd.exe) or,                                        *
+*       CTRL+BREAK (if you run WinDBG),                                       *
+*   on your debugger machine's keyboard.                                      *
+*                                                                             *
+*                   THIS IS NOT A BUG OR A SYSTEM CRASH                       *
+*                                                                             *
+* If you did not intend to break into the debugger, press the "g" key, then   *
+* press the "Enter" key now.  This message might immediately reappear.  If it *
+* does, press "g" and "Enter" again.                                          *
+*                                                                             *
+*******************************************************************************
+nt!RtlpBreakWithStatusInstruction:
+80527fc8 cc              int     3
+kd> .relead
+          ^ Syntax error in '.relead'
+kd> .reload
+Connected to Windows XP 2600 x86 compatible target at (Fri Dec 23 17:29:55.125 2011 (UTC + 8:00)), ptr64 FALSE
+Loading Kernel Symbols
+...............................................................
+.............................................................
+Loading User Symbols
+....................................................
+Loading unloaded module list
+.............
+*** ERROR: Module load completed but symbols could not be loaded for msprivs.dll
+*** ERROR: Symbol file could not be found.  Defaulted to export symbols for iphlpapi.dll - 
+*** ERROR: Module load completed but symbols could not be loaded for vmx_fb.dll
+*** ERROR: Module load completed but symbols could not be loaded for EhomeProc.sys
+*** ERROR: Module load completed but symbols could not be loaded for BAPIDRV.SYS
+*** ERROR: Module load completed but symbols could not be loaded for qutmdrv.sys
+*** ERROR: Module load completed but symbols could not be loaded for vmhgfs.sys
+*** ERROR: Module load completed but symbols could not be loaded for ipnat.sys
+*** ERROR: Module load completed but symbols could not be loaded for 360netmon.sys
+*** ERROR: Module load completed but symbols could not be loaded for ipsec.sys
+*** ERROR: Module load completed but symbols could not be loaded for 360SelfProtection.sys
+*** ERROR: Module load completed but symbols could not be loaded for Efimon.sys
+*** ERROR: Module load completed but symbols could not be loaded for EHomeSec.sys
+*** ERROR: Module load completed but symbols could not be loaded for isapnp.sys
+*** ERROR: Module load completed but symbols could not be loaded for Hookport.sys
+*** ERROR: Symbol file could not be found.  Defaulted to export symbols for vmci.sys - 
+*** ERROR: Symbol file could not be found.  Defaulted to export symbols for drmk.sys - 
+*** ERROR: Module load completed but symbols could not be loaded for intelppm.sys
+*** ERROR: Module load completed but symbols could not be loaded for vmdebug.sys
+*** ERROR: Module load completed but symbols could not be loaded for vmx_svga.sys
+*** ERROR: Module load completed but symbols could not be loaded for vmxnet.sys
+*** ERROR: Module load completed but symbols could not be loaded for qutmipc.sys
+*** ERROR: Module load completed but symbols could not be loaded for vmscsi.sys
+*** ERROR: Module load completed but symbols could not be loaded for SiWinAcc.sys
+*** ERROR: Module load completed but symbols could not be loaded for EHomeNet.sys
+*** ERROR: Module load completed but symbols could not be loaded for intelide.sys
+*** ERROR: Module load completed but symbols could not be loaded for vmmouse.sys
+*** ERROR: Module load completed but symbols could not be loaded for vmmemctl.sys
+kd> dt -b _EPROCESS
+ntdll!_EPROCESS
+   +0x000 Pcb              : _KPROCESS
+      +0x000 Header           : _DISPATCHER_HEADER
+         +0x000 Type             : UChar
+         +0x001 Absolute         : UChar
+         +0x002 Size             : UChar
+         +0x003 Inserted         : UChar
+         +0x004 SignalState      : Int4B
+         +0x008 WaitListHead     : _LIST_ENTRY
+            +0x000 Flink            : Ptr32 
+            +0x004 Blink            : Ptr32 
+      +0x010 ProfileListHead  : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x018 DirectoryTableBase : Uint4B
+      +0x020 LdtDescriptor    : _KGDTENTRY
+         +0x000 LimitLow         : Uint2B
+         +0x002 BaseLow          : Uint2B
+         +0x004 HighWord         : __unnamed
+            +0x000 Bytes            : __unnamed
+               +0x000 BaseMid          : UChar
+               +0x001 Flags1           : UChar
+               +0x002 Flags2           : UChar
+               +0x003 BaseHi           : UChar
+            +0x000 Bits             : __unnamed
+               +0x000 BaseMid          : Pos 0, 8 Bits
+               +0x000 Type             : Pos 8, 5 Bits
+               +0x000 Dpl              : Pos 13, 2 Bits
+               +0x000 Pres             : Pos 15, 1 Bit
+               +0x000 LimitHi          : Pos 16, 4 Bits
+               +0x000 Sys              : Pos 20, 1 Bit
+               +0x000 Reserved_0       : Pos 21, 1 Bit
+               +0x000 Default_Big      : Pos 22, 1 Bit
+               +0x000 Granularity      : Pos 23, 1 Bit
+               +0x000 BaseHi           : Pos 24, 8 Bits
+      +0x028 Int21Descriptor  : _KIDTENTRY
+         +0x000 Offset           : Uint2B
+         +0x002 Selector         : Uint2B
+         +0x004 Access           : Uint2B
+         +0x006 ExtendedOffset   : Uint2B
+      +0x030 IopmOffset       : Uint2B
+      +0x032 Iopl             : UChar
+      +0x033 Unused           : UChar
+      +0x034 ActiveProcessors : Uint4B
+      +0x038 KernelTime       : Uint4B
+      +0x03c UserTime         : Uint4B
+      +0x040 ReadyListHead    : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x048 SwapListEntry    : _SINGLE_LIST_ENTRY
+         +0x000 Next             : Ptr32 
+      +0x04c VdmTrapcHandler  : Ptr32 
+      +0x050 ThreadListHead   : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x058 ProcessLock      : Uint4B
+      +0x05c Affinity         : Uint4B
+      +0x060 StackCount       : Uint2B
+      +0x062 BasePriority     : Char
+      +0x063 ThreadQuantum    : Char
+      +0x064 AutoAlignment    : UChar
+      +0x065 State            : UChar
+      +0x066 ThreadSeed       : UChar
+      +0x067 DisableBoost     : UChar
+      +0x068 PowerState       : UChar
+      +0x069 DisableQuantum   : UChar
+      +0x06a IdealNode        : UChar
+      +0x06b Flags            : _KEXECUTE_OPTIONS
+         +0x000 ExecuteDisable   : Pos 0, 1 Bit
+         +0x000 ExecuteEnable    : Pos 1, 1 Bit
+         +0x000 DisableThunkEmulation : Pos 2, 1 Bit
+         +0x000 Permanent        : Pos 3, 1 Bit
+         +0x000 ExecuteDispatchEnable : Pos 4, 1 Bit
+         +0x000 ImageDispatchEnable : Pos 5, 1 Bit
+         +0x000 Spare            : Pos 6, 2 Bits
+      +0x06b ExecuteOptions   : UChar
+   +0x06c ProcessLock      : _EX_PUSH_LOCK
+      +0x000 Waiting          : Pos 0, 1 Bit
+      +0x000 Exclusive        : Pos 1, 1 Bit
+      +0x000 Shared           : Pos 2, 30 Bits
+      +0x000 Value            : Uint4B
+      +0x000 Ptr              : Ptr32 
+   +0x070 CreateTime       : _LARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Int4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Int4B
+      +0x000 QuadPart         : Int8B
+   +0x078 ExitTime         : _LARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Int4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Int4B
+      +0x000 QuadPart         : Int8B
+   +0x080 RundownProtect   : _EX_RUNDOWN_REF
+      +0x000 Count            : Uint4B
+      +0x000 Ptr              : Ptr32 
+   +0x084 UniqueProcessId  : Ptr32 
+   +0x088 ActiveProcessLinks : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x090 QuotaUsage       : Uint4B
+   +0x09c QuotaPeak        : Uint4B
+   +0x0a8 CommitCharge     : Uint4B
+   +0x0ac PeakVirtualSize  : Uint4B
+   +0x0b0 VirtualSize      : Uint4B
+   +0x0b4 SessionProcessLinks : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x0bc DebugPort        : Ptr32 
+   +0x0c0 ExceptionPort    : Ptr32 
+   +0x0c4 ObjectTable      : Ptr32 
+   +0x0c8 Token            : _EX_FAST_REF
+      +0x000 Object           : Ptr32 
+      +0x000 RefCnt           : Pos 0, 3 Bits
+      +0x000 Value            : Uint4B
+   +0x0cc WorkingSetLock   : _FAST_MUTEX
+      +0x000 Count            : Int4B
+      +0x004 Owner            : Ptr32 
+      +0x008 Contention       : Uint4B
+      +0x00c Event            : _KEVENT
+         +0x000 Header           : _DISPATCHER_HEADER
+            +0x000 Type             : UChar
+            +0x001 Absolute         : UChar
+            +0x002 Size             : UChar
+            +0x003 Inserted         : UChar
+            +0x004 SignalState      : Int4B
+            +0x008 WaitListHead     : _LIST_ENTRY
+               +0x000 Flink            : Ptr32 
+               +0x004 Blink            : Ptr32 
+      +0x01c OldIrql          : Uint4B
+   +0x0ec WorkingSetPage   : Uint4B
+   +0x0f0 AddressCreationLock : _FAST_MUTEX
+      +0x000 Count            : Int4B
+      +0x004 Owner            : Ptr32 
+      +0x008 Contention       : Uint4B
+      +0x00c Event            : _KEVENT
+         +0x000 Header           : _DISPATCHER_HEADER
+            +0x000 Type             : UChar
+            +0x001 Absolute         : UChar
+            +0x002 Size             : UChar
+            +0x003 Inserted         : UChar
+            +0x004 SignalState      : Int4B
+            +0x008 WaitListHead     : _LIST_ENTRY
+               +0x000 Flink            : Ptr32 
+               +0x004 Blink            : Ptr32 
+      +0x01c OldIrql          : Uint4B
+   +0x110 HyperSpaceLock   : Uint4B
+   +0x114 ForkInProgress   : Ptr32 
+   +0x118 HardwareTrigger  : Uint4B
+   +0x11c VadRoot          : Ptr32 
+   +0x120 VadHint          : Ptr32 
+   +0x124 CloneRoot        : Ptr32 
+   +0x128 NumberOfPrivatePages : Uint4B
+   +0x12c NumberOfLockedPages : Uint4B
+   +0x130 Win32Process     : Ptr32 
+   +0x134 Job              : Ptr32 
+   +0x138 SectionObject    : Ptr32 
+   +0x13c SectionBaseAddress : Ptr32 
+   +0x140 QuotaBlock       : Ptr32 
+   +0x144 WorkingSetWatch  : Ptr32 
+   +0x148 Win32WindowStation : Ptr32 
+   +0x14c InheritedFromUniqueProcessId : Ptr32 
+   +0x150 LdtInformation   : Ptr32 
+   +0x154 VadFreeHint      : Ptr32 
+   +0x158 VdmObjects       : Ptr32 
+   +0x15c DeviceMap        : Ptr32 
+   +0x160 PhysicalVadList  : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x168 PageDirectoryPte : _HARDWARE_PTE_X86
+      +0x000 Valid            : Pos 0, 1 Bit
+      +0x000 Write            : Pos 1, 1 Bit
+      +0x000 Owner            : Pos 2, 1 Bit
+      +0x000 WriteThrough     : Pos 3, 1 Bit
+      +0x000 CacheDisable     : Pos 4, 1 Bit
+      +0x000 Accessed         : Pos 5, 1 Bit
+      +0x000 Dirty            : Pos 6, 1 Bit
+      +0x000 LargePage        : Pos 7, 1 Bit
+      +0x000 Global           : Pos 8, 1 Bit
+      +0x000 CopyOnWrite      : Pos 9, 1 Bit
+      +0x000 Prototype        : Pos 10, 1 Bit
+      +0x000 reserved         : Pos 11, 1 Bit
+      +0x000 PageFrameNumber  : Pos 12, 20 Bits
+   +0x168 Filler           : Uint8B
+   +0x170 Session          : Ptr32 
+   +0x174 ImageFileName    : UChar
+   +0x184 JobLinks         : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x18c LockedPagesList  : Ptr32 
+   +0x190 ThreadListHead   : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x198 SecurityPort     : Ptr32 
+   +0x19c PaeTop           : Ptr32 
+   +0x1a0 ActiveThreads    : Uint4B
+   +0x1a4 GrantedAccess    : Uint4B
+   +0x1a8 DefaultHardErrorProcessing : Uint4B
+   +0x1ac LastThreadExitStatus : Int4B
+   +0x1b0 Peb              : Ptr32 
+   +0x1b4 PrefetchTrace    : _EX_FAST_REF
+      +0x000 Object           : Ptr32 
+      +0x000 RefCnt           : Pos 0, 3 Bits
+      +0x000 Value            : Uint4B
+   +0x1b8 ReadOperationCount : _LARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Int4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Int4B
+      +0x000 QuadPart         : Int8B
+   +0x1c0 WriteOperationCount : _LARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Int4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Int4B
+      +0x000 QuadPart         : Int8B
+   +0x1c8 OtherOperationCount : _LARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Int4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Int4B
+      +0x000 QuadPart         : Int8B
+   +0x1d0 ReadTransferCount : _LARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Int4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Int4B
+      +0x000 QuadPart         : Int8B
+   +0x1d8 WriteTransferCount : _LARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Int4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Int4B
+      +0x000 QuadPart         : Int8B
+   +0x1e0 OtherTransferCount : _LARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Int4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Int4B
+      +0x000 QuadPart         : Int8B
+   +0x1e8 CommitChargeLimit : Uint4B
+   +0x1ec CommitChargePeak : Uint4B
+   +0x1f0 AweInfo          : Ptr32 
+   +0x1f4 SeAuditProcessCreationInfo : _SE_AUDIT_PROCESS_CREATION_INFO
+      +0x000 ImageFileName    : Ptr32 
+   +0x1f8 Vm               : _MMSUPPORT
+      +0x000 LastTrimTime     : _LARGE_INTEGER
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Int4B
+         +0x000 u                : __unnamed
+            +0x000 LowPart          : Uint4B
+            +0x004 HighPart         : Int4B
+         +0x000 QuadPart         : Int8B
+      +0x008 Flags            : _MMSUPPORT_FLAGS
+         +0x000 SessionSpace     : Pos 0, 1 Bit
+         +0x000 BeingTrimmed     : Pos 1, 1 Bit
+         +0x000 SessionLeader    : Pos 2, 1 Bit
+         +0x000 TrimHard         : Pos 3, 1 Bit
+         +0x000 WorkingSetHard   : Pos 4, 1 Bit
+         +0x000 AddressSpaceBeingDeleted : Pos 5, 1 Bit
+         +0x000 Available        : Pos 6, 10 Bits
+         +0x000 AllowWorkingSetAdjustment : Pos 16, 8 Bits
+         +0x000 MemoryPriority   : Pos 24, 8 Bits
+      +0x00c PageFaultCount   : Uint4B
+      +0x010 PeakWorkingSetSize : Uint4B
+      +0x014 WorkingSetSize   : Uint4B
+      +0x018 MinimumWorkingSetSize : Uint4B
+      +0x01c MaximumWorkingSetSize : Uint4B
+      +0x020 VmWorkingSetList : Ptr32 
+      +0x024 WorkingSetExpansionLinks : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x02c Claim            : Uint4B
+      +0x030 NextEstimationSlot : Uint4B
+      +0x034 NextAgingSlot    : Uint4B
+      +0x038 EstimatedAvailable : Uint4B
+      +0x03c GrowthSinceLastEstimate : Uint4B
+   +0x238 LastFaultCount   : Uint4B
+   +0x23c ModifiedPageCount : Uint4B
+   +0x240 NumberOfVads     : Uint4B
+   +0x244 JobStatus        : Uint4B
+   +0x248 Flags            : Uint4B
+   +0x248 CreateReported   : Pos 0, 1 Bit
+   +0x248 NoDebugInherit   : Pos 1, 1 Bit
+   +0x248 ProcessExiting   : Pos 2, 1 Bit
+   +0x248 ProcessDelete    : Pos 3, 1 Bit
+   +0x248 Wow64SplitPages  : Pos 4, 1 Bit
+   +0x248 VmDeleted        : Pos 5, 1 Bit
+   +0x248 OutswapEnabled   : Pos 6, 1 Bit
+   +0x248 Outswapped       : Pos 7, 1 Bit
+   +0x248 ForkFailed       : Pos 8, 1 Bit
+   +0x248 HasPhysicalVad   : Pos 9, 1 Bit
+   +0x248 AddressSpaceInitialized : Pos 10, 2 Bits
+   +0x248 SetTimerResolution : Pos 12, 1 Bit
+   +0x248 BreakOnTermination : Pos 13, 1 Bit
+   +0x248 SessionCreationUnderway : Pos 14, 1 Bit
+   +0x248 WriteWatch       : Pos 15, 1 Bit
+   +0x248 ProcessInSession : Pos 16, 1 Bit
+   +0x248 OverrideAddressSpace : Pos 17, 1 Bit
+   +0x248 HasAddressSpace  : Pos 18, 1 Bit
+   +0x248 LaunchPrefetched : Pos 19, 1 Bit
+   +0x248 InjectInpageErrors : Pos 20, 1 Bit
+   +0x248 VmTopDown        : Pos 21, 1 Bit
+   +0x248 Unused3          : Pos 22, 1 Bit
+   +0x248 Unused4          : Pos 23, 1 Bit
+   +0x248 VdmAllowed       : Pos 24, 1 Bit
+   +0x248 Unused           : Pos 25, 5 Bits
+   +0x248 Unused1          : Pos 30, 1 Bit
+   +0x248 Unused2          : Pos 31, 1 Bit
+   +0x24c ExitStatus       : Int4B
+   +0x250 NextPageColor    : Uint2B
+   +0x252 SubSystemMinorVersion : UChar
+   +0x253 SubSystemMajorVersion : UChar
+   +0x252 SubSystemVersion : Uint2B
+   +0x254 PriorityClass    : UChar
+   +0x255 WorkingSetAcquiredUnsafe : UChar
+   +0x258 Cookie           : Uint4B
+kd> vvertarget 
+    ^ Syntax error in 'vvertarget '
+kd> vertarget 
+Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
+Product: WinNt, suite: TerminalServer SingleUserTS
+Built by: 2600.xpsp_sp2_gdr.070227-2254
+Machine Name:
+Kernel base = 0x804d8000 PsLoadedModuleList = 0x805543a0
+Debug session time: Fri Dec 23 17:28:19.452 2011 (UTC + 8:00)
+System Uptime: 0 days 0:02:11.953
+kd> dt -b _PEB
+ntdll!_PEB
+   +0x000 InheritedAddressSpace : UChar
+   +0x001 ReadImageFileExecOptions : UChar
+   +0x002 BeingDebugged    : UChar
+   +0x003 SpareBool        : UChar
+   +0x004 Mutant           : Ptr32 
+   +0x008 ImageBaseAddress : Ptr32 
+   +0x00c Ldr              : Ptr32 
+   +0x010 ProcessParameters : Ptr32 
+   +0x014 SubSystemData    : Ptr32 
+   +0x018 ProcessHeap      : Ptr32 
+   +0x01c FastPebLock      : Ptr32 
+   +0x020 FastPebLockRoutine : Ptr32 
+   +0x024 FastPebUnlockRoutine : Ptr32 
+   +0x028 EnvironmentUpdateCount : Uint4B
+   +0x02c KernelCallbackTable : Ptr32 
+   +0x030 SystemReserved   : Uint4B
+   +0x034 AtlThunkSListPtr32 : Uint4B
+   +0x038 FreeList         : Ptr32 
+   +0x03c TlsExpansionCounter : Uint4B
+   +0x040 TlsBitmap        : Ptr32 
+   +0x044 TlsBitmapBits    : Uint4B
+   +0x04c ReadOnlySharedMemoryBase : Ptr32 
+   +0x050 ReadOnlySharedMemoryHeap : Ptr32 
+   +0x054 ReadOnlyStaticServerData : Ptr32 
+   +0x058 AnsiCodePageData : Ptr32 
+   +0x05c OemCodePageData  : Ptr32 
+   +0x060 UnicodeCaseTableData : Ptr32 
+   +0x064 NumberOfProcessors : Uint4B
+   +0x068 NtGlobalFlag     : Uint4B
+   +0x070 CriticalSectionTimeout : _LARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Int4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Int4B
+      +0x000 QuadPart         : Int8B
+   +0x078 HeapSegmentReserve : Uint4B
+   +0x07c HeapSegmentCommit : Uint4B
+   +0x080 HeapDeCommitTotalFreeThreshold : Uint4B
+   +0x084 HeapDeCommitFreeBlockThreshold : Uint4B
+   +0x088 NumberOfHeaps    : Uint4B
+   +0x08c MaximumNumberOfHeaps : Uint4B
+   +0x090 ProcessHeaps     : Ptr32 
+   +0x094 GdiSharedHandleTable : Ptr32 
+   +0x098 ProcessStarterHelper : Ptr32 
+   +0x09c GdiDCAttributeList : Uint4B
+   +0x0a0 LoaderLock       : Ptr32 
+   +0x0a4 OSMajorVersion   : Uint4B
+   +0x0a8 OSMinorVersion   : Uint4B
+   +0x0ac OSBuildNumber    : Uint2B
+   +0x0ae OSCSDVersion     : Uint2B
+   +0x0b0 OSPlatformId     : Uint4B
+   +0x0b4 ImageSubsystem   : Uint4B
+   +0x0b8 ImageSubsystemMajorVersion : Uint4B
+   +0x0bc ImageSubsystemMinorVersion : Uint4B
+   +0x0c0 ImageProcessAffinityMask : Uint4B
+   +0x0c4 GdiHandleBuffer  : Uint4B
+   +0x14c PostProcessInitRoutine : Ptr32 
+   +0x150 TlsExpansionBitmap : Ptr32 
+   +0x154 TlsExpansionBitmapBits : Uint4B
+   +0x1d4 SessionId        : Uint4B
+   +0x1d8 AppCompatFlags   : _ULARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Uint4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Uint4B
+      +0x000 QuadPart         : Uint8B
+   +0x1e0 AppCompatFlagsUser : _ULARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Uint4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Uint4B
+      +0x000 QuadPart         : Uint8B
+   +0x1e8 pShimData        : Ptr32 
+   +0x1ec AppCompatInfo    : Ptr32 
+   +0x1f0 CSDVersion       : _UNICODE_STRING
+      +0x000 Length           : Uint2B
+      +0x002 MaximumLength    : Uint2B
+      +0x004 Buffer           : Ptr32 
+   +0x1f8 ActivationContextData : Ptr32 
+   +0x1fc ProcessAssemblyStorageMap : Ptr32 
+   +0x200 SystemDefaultActivationContextData : Ptr32 
+   +0x204 SystemAssemblyStorageMap : Ptr32 
+   +0x208 MinimumStackCommit : Uint4B
+kd> dt _RTL_USER_PROCESS_PARAMETERS
+ntdll!_RTL_USER_PROCESS_PARAMETERS
+   +0x000 MaximumLength    : Uint4B
+   +0x004 Length           : Uint4B
+   +0x008 Flags            : Uint4B
+   +0x00c DebugFlags       : Uint4B
+   +0x010 ConsoleHandle    : Ptr32 Void
+   +0x014 ConsoleFlags     : Uint4B
+   +0x018 StandardInput    : Ptr32 Void
+   +0x01c StandardOutput   : Ptr32 Void
+   +0x020 StandardError    : Ptr32 Void
+   +0x024 CurrentDirectory : _CURDIR
+   +0x030 DllPath          : _UNICODE_STRING
+   +0x038 ImagePathName    : _UNICODE_STRING
+   +0x040 CommandLine      : _UNICODE_STRING
+   +0x048 Environment      : Ptr32 Void
+   +0x04c StartingX        : Uint4B
+   +0x050 StartingY        : Uint4B
+   +0x054 CountX           : Uint4B
+   +0x058 CountY           : Uint4B
+   +0x05c CountCharsX      : Uint4B
+   +0x060 CountCharsY      : Uint4B
+   +0x064 FillAttribute    : Uint4B
+   +0x068 WindowFlags      : Uint4B
+   +0x06c ShowWindowFlags  : Uint4B
+   +0x070 WindowTitle      : _UNICODE_STRING
+   +0x078 DesktopInfo      : _UNICODE_STRING
+   +0x080 ShellInfo        : _UNICODE_STRING
+   +0x088 RuntimeData      : _UNICODE_STRING
+   +0x090 CurrentDirectores : [32] _RTL_DRIVE_LETTER_CURDIR
+kd> dt -b _PEB_LDR_DATA
+ntdll!_PEB_LDR_DATA
+   +0x000 Length           : Uint4B
+   +0x004 Initialized      : UChar
+   +0x008 SsHandle         : Ptr32 
+   +0x00c InLoadOrderModuleList : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x014 InMemoryOrderModuleList : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x01c InInitializationOrderModuleList : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x024 EntryInProgress  : Ptr32 
+kd> dt -b _LDR_DATA_TABLE*
+*************************************************************************
+***                                                                   ***
+***                                                                   ***
+***    Your debugger is not using the correct symbols                 ***
+***                                                                   ***
+***    In order for this command to work properly, your symbol path   ***
+***    must point to .pdb files that have full type information.      ***
+***                                                                   ***
+***    Certain .pdb files (such as the public OS symbols) do not      ***
+***    contain the required information.  Contact the group that      ***
+***    provided you with these symbols if you need this command to    ***
+***    work.                                                          ***
+***                                                                   ***
+***    Type referenced: _LDR_DATA_TABLE*                              ***
+***                                                                   ***
+*************************************************************************
+Symbol _LDR_DATA_TABLE* not found.
+kd> dt -b _LDR_DATA_TABLE_HANDLE
+*************************************************************************
+***                                                                   ***
+***                                                                   ***
+***    Your debugger is not using the correct symbols                 ***
+***                                                                   ***
+***    In order for this command to work properly, your symbol path   ***
+***    must point to .pdb files that have full type information.      ***
+***                                                                   ***
+***    Certain .pdb files (such as the public OS symbols) do not      ***
+***    contain the required information.  Contact the group that      ***
+***    provided you with these symbols if you need this command to    ***
+***    work.                                                          ***
+***                                                                   ***
+***    Type referenced: _LDR_DATA_TABLE_HANDLE                        ***
+***                                                                   ***
+*************************************************************************
+Symbol _LDR_DATA_TABLE_HANDLE not found.
+kd> dt -b _LDR_DATA_TABLE_ENTRY
+ntdll!_LDR_DATA_TABLE_ENTRY
+   +0x000 InLoadOrderLinks : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x008 InMemoryOrderLinks : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x010 InInitializationOrderLinks : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x018 DllBase          : Ptr32 
+   +0x01c EntryPoint       : Ptr32 
+   +0x020 SizeOfImage      : Uint4B
+   +0x024 FullDllName      : _UNICODE_STRING
+      +0x000 Length           : Uint2B
+      +0x002 MaximumLength    : Uint2B
+      +0x004 Buffer           : Ptr32 
+   +0x02c BaseDllName      : _UNICODE_STRING
+      +0x000 Length           : Uint2B
+      +0x002 MaximumLength    : Uint2B
+      +0x004 Buffer           : Ptr32 
+   +0x034 Flags            : Uint4B
+   +0x038 LoadCount        : Uint2B
+   +0x03a TlsIndex         : Uint2B
+   +0x03c HashLinks        : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x03c SectionPointer   : Ptr32 
+   +0x040 CheckSum         : Uint4B
+   +0x044 TimeDateStamp    : Uint4B
+   +0x044 LoadedImports    : Ptr32 
+   +0x048 EntryPointActivationContext : Ptr32 
+   +0x04c PatchInformation : Ptr32 
+kd> dt -b _ETHREAD
+ntdll!_ETHREAD
+   +0x000 Tcb              : _KTHREAD
+      +0x000 Header           : _DISPATCHER_HEADER
+         +0x000 Type             : UChar
+         +0x001 Absolute         : UChar
+         +0x002 Size             : UChar
+         +0x003 Inserted         : UChar
+         +0x004 SignalState      : Int4B
+         +0x008 WaitListHead     : _LIST_ENTRY
+            +0x000 Flink            : Ptr32 
+            +0x004 Blink            : Ptr32 
+      +0x010 MutantListHead   : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x018 InitialStack     : Ptr32 
+      +0x01c StackLimit       : Ptr32 
+      +0x020 Teb              : Ptr32 
+      +0x024 TlsArray         : Ptr32 
+      +0x028 KernelStack      : Ptr32 
+      +0x02c DebugActive      : UChar
+      +0x02d State            : UChar
+      +0x02e Alerted          : UChar
+      +0x030 Iopl             : UChar
+      +0x031 NpxState         : UChar
+      +0x032 Saturation       : Char
+      +0x033 Priority         : Char
+      +0x034 ApcState         : _KAPC_STATE
+         +0x000 ApcListHead      : _LIST_ENTRY
+            +0x000 Flink            : Ptr32 
+            +0x004 Blink            : Ptr32 
+         +0x010 Process          : Ptr32 
+         +0x014 KernelApcInProgress : UChar
+         +0x015 KernelApcPending : UChar
+         +0x016 UserApcPending   : UChar
+      +0x04c ContextSwitches  : Uint4B
+      +0x050 IdleSwapBlock    : UChar
+      +0x051 Spare0           : UChar
+      +0x054 WaitStatus       : Int4B
+      +0x058 WaitIrql         : UChar
+      +0x059 WaitMode         : Char
+      +0x05a WaitNext         : UChar
+      +0x05b WaitReason       : UChar
+      +0x05c WaitBlockList    : Ptr32 
+      +0x060 WaitListEntry    : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x060 SwapListEntry    : _SINGLE_LIST_ENTRY
+         +0x000 Next             : Ptr32 
+      +0x068 WaitTime         : Uint4B
+      +0x06c BasePriority     : Char
+      +0x06d DecrementCount   : UChar
+      +0x06e PriorityDecrement : Char
+      +0x06f Quantum          : Char
+      +0x070 WaitBlock        : _KWAIT_BLOCK
+         +0x000 WaitListEntry    : _LIST_ENTRY
+            +0x000 Flink            : Ptr32 
+            +0x004 Blink            : Ptr32 
+         +0x008 Thread           : Ptr32 
+         +0x00c Object           : Ptr32 
+         +0x010 NextWaitBlock    : Ptr32 
+         +0x014 WaitKey          : Uint2B
+         +0x016 WaitType         : Uint2B
+      +0x0d0 LegoData         : Ptr32 
+      +0x0d4 KernelApcDisable : Uint4B
+      +0x0d8 UserAffinity     : Uint4B
+      +0x0dc SystemAffinityActive : UChar
+      +0x0dd PowerState       : UChar
+      +0x0de NpxIrql          : UChar
+      +0x0df InitialNode      : UChar
+      +0x0e0 ServiceTable     : Ptr32 
+      +0x0e4 Queue            : Ptr32 
+      +0x0e8 ApcQueueLock     : Uint4B
+      +0x0f0 Timer            : _KTIMER
+         +0x000 Header           : _DISPATCHER_HEADER
+            +0x000 Type             : UChar
+            +0x001 Absolute         : UChar
+            +0x002 Size             : UChar
+            +0x003 Inserted         : UChar
+            +0x004 SignalState      : Int4B
+            +0x008 WaitListHead     : _LIST_ENTRY
+               +0x000 Flink            : Ptr32 
+               +0x004 Blink            : Ptr32 
+         +0x010 DueTime          : _ULARGE_INTEGER
+            +0x000 LowPart          : Uint4B
+            +0x004 HighPart         : Uint4B
+            +0x000 u                : __unnamed
+               +0x000 LowPart          : Uint4B
+               +0x004 HighPart         : Uint4B
+            +0x000 QuadPart         : Uint8B
+         +0x018 TimerListEntry   : _LIST_ENTRY
+            +0x000 Flink            : Ptr32 
+            +0x004 Blink            : Ptr32 
+         +0x020 Dpc              : Ptr32 
+         +0x024 Period           : Int4B
+      +0x118 QueueListEntry   : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x120 SoftAffinity     : Uint4B
+      +0x124 Affinity         : Uint4B
+      +0x128 Preempted        : UChar
+      +0x129 ProcessReadyQueue : UChar
+      +0x12a KernelStackResident : UChar
+      +0x12b NextProcessor    : UChar
+      +0x12c CallbackStack    : Ptr32 
+      +0x130 Win32Thread      : Ptr32 
+      +0x134 TrapFrame        : Ptr32 
+      +0x138 ApcStatePointer  : Ptr32 
+      +0x140 PreviousMode     : Char
+      +0x141 EnableStackSwap  : UChar
+      +0x142 LargeStack       : UChar
+      +0x143 ResourceIndex    : UChar
+      +0x144 KernelTime       : Uint4B
+      +0x148 UserTime         : Uint4B
+      +0x14c SavedApcState    : _KAPC_STATE
+         +0x000 ApcListHead      : _LIST_ENTRY
+            +0x000 Flink            : Ptr32 
+            +0x004 Blink            : Ptr32 
+         +0x010 Process          : Ptr32 
+         +0x014 KernelApcInProgress : UChar
+         +0x015 KernelApcPending : UChar
+         +0x016 UserApcPending   : UChar
+      +0x164 Alertable        : UChar
+      +0x165 ApcStateIndex    : UChar
+      +0x166 ApcQueueable     : UChar
+      +0x167 AutoAlignment    : UChar
+      +0x168 StackBase        : Ptr32 
+      +0x16c SuspendApc       : _KAPC
+         +0x000 Type             : Int2B
+         +0x002 Size             : Int2B
+         +0x004 Spare0           : Uint4B
+         +0x008 Thread           : Ptr32 
+         +0x00c ApcListEntry     : _LIST_ENTRY
+            +0x000 Flink            : Ptr32 
+            +0x004 Blink            : Ptr32 
+         +0x014 KernelRoutine    : Ptr32 
+         +0x018 RundownRoutine   : Ptr32 
+         +0x01c NormalRoutine    : Ptr32 
+         +0x020 NormalContext    : Ptr32 
+         +0x024 SystemArgument1  : Ptr32 
+         +0x028 SystemArgument2  : Ptr32 
+         +0x02c ApcStateIndex    : Char
+         +0x02d ApcMode          : Char
+         +0x02e Inserted         : UChar
+      +0x19c SuspendSemaphore : _KSEMAPHORE
+         +0x000 Header           : _DISPATCHER_HEADER
+            +0x000 Type             : UChar
+            +0x001 Absolute         : UChar
+            +0x002 Size             : UChar
+            +0x003 Inserted         : UChar
+            +0x004 SignalState      : Int4B
+            +0x008 WaitListHead     : _LIST_ENTRY
+               +0x000 Flink            : Ptr32 
+               +0x004 Blink            : Ptr32 
+         +0x010 Limit            : Int4B
+      +0x1b0 ThreadListEntry  : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x1b8 FreezeCount      : Char
+      +0x1b9 SuspendCount     : Char
+      +0x1ba IdealProcessor   : UChar
+      +0x1bb DisableBoost     : UChar
+   +0x1c0 CreateTime       : _LARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Int4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Int4B
+      +0x000 QuadPart         : Int8B
+   +0x1c0 NestedFaultCount : Pos 0, 2 Bits
+   +0x1c0 ApcNeeded        : Pos 2, 1 Bit
+   +0x1c8 ExitTime         : _LARGE_INTEGER
+      +0x000 LowPart          : Uint4B
+      +0x004 HighPart         : Int4B
+      +0x000 u                : __unnamed
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Int4B
+      +0x000 QuadPart         : Int8B
+   +0x1c8 LpcReplyChain    : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x1c8 KeyedWaitChain   : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x1d0 ExitStatus       : Int4B
+   +0x1d0 OfsChain         : Ptr32 
+   +0x1d4 PostBlockList    : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x1dc TerminationPort  : Ptr32 
+   +0x1dc ReaperLink       : Ptr32 
+   +0x1dc KeyedWaitValue   : Ptr32 
+   +0x1e0 ActiveTimerListLock : Uint4B
+   +0x1e4 ActiveTimerListHead : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x1ec Cid              : _CLIENT_ID
+      +0x000 UniqueProcess    : Ptr32 
+      +0x004 UniqueThread     : Ptr32 
+   +0x1f4 LpcReplySemaphore : _KSEMAPHORE
+      +0x000 Header           : _DISPATCHER_HEADER
+         +0x000 Type             : UChar
+         +0x001 Absolute         : UChar
+         +0x002 Size             : UChar
+         +0x003 Inserted         : UChar
+         +0x004 SignalState      : Int4B
+         +0x008 WaitListHead     : _LIST_ENTRY
+            +0x000 Flink            : Ptr32 
+            +0x004 Blink            : Ptr32 
+      +0x010 Limit            : Int4B
+   +0x1f4 KeyedWaitSemaphore : _KSEMAPHORE
+      +0x000 Header           : _DISPATCHER_HEADER
+         +0x000 Type             : UChar
+         +0x001 Absolute         : UChar
+         +0x002 Size             : UChar
+         +0x003 Inserted         : UChar
+         +0x004 SignalState      : Int4B
+         +0x008 WaitListHead     : _LIST_ENTRY
+            +0x000 Flink            : Ptr32 
+            +0x004 Blink            : Ptr32 
+      +0x010 Limit            : Int4B
+   +0x208 LpcReplyMessage  : Ptr32 
+   +0x208 LpcWaitingOnPort : Ptr32 
+   +0x20c ImpersonationInfo : Ptr32 
+   +0x210 IrpList          : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x218 TopLevelIrp      : Uint4B
+   +0x21c DeviceToVerify   : Ptr32 
+   +0x220 ThreadsProcess   : Ptr32 
+   +0x224 StartAddress     : Ptr32 
+   +0x228 Win32StartAddress : Ptr32 
+   +0x228 LpcReceivedMessageId : Uint4B
+   +0x22c ThreadListEntry  : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x234 RundownProtect   : _EX_RUNDOWN_REF
+      +0x000 Count            : Uint4B
+      +0x000 Ptr              : Ptr32 
+   +0x238 ThreadLock       : _EX_PUSH_LOCK
+      +0x000 Waiting          : Pos 0, 1 Bit
+      +0x000 Exclusive        : Pos 1, 1 Bit
+      +0x000 Shared           : Pos 2, 30 Bits
+      +0x000 Value            : Uint4B
+      +0x000 Ptr              : Ptr32 
+   +0x23c LpcReplyMessageId : Uint4B
+   +0x240 ReadClusterSize  : Uint4B
+   +0x244 GrantedAccess    : Uint4B
+   +0x248 CrossThreadFlags : Uint4B
+   +0x248 Terminated       : Pos 0, 1 Bit
+   +0x248 DeadThread       : Pos 1, 1 Bit
+   +0x248 HideFromDebugger : Pos 2, 1 Bit
+   +0x248 ActiveImpersonationInfo : Pos 3, 1 Bit
+   +0x248 SystemThread     : Pos 4, 1 Bit
+   +0x248 HardErrorsAreDisabled : Pos 5, 1 Bit
+   +0x248 BreakOnTermination : Pos 6, 1 Bit
+   +0x248 SkipCreationMsg  : Pos 7, 1 Bit
+   +0x248 SkipTerminationMsg : Pos 8, 1 Bit
+   +0x24c SameThreadPassiveFlags : Uint4B
+   +0x24c ActiveExWorker   : Pos 0, 1 Bit
+   +0x24c ExWorkerCanWaitUser : Pos 1, 1 Bit
+   +0x24c MemoryMaker      : Pos 2, 1 Bit
+   +0x250 SameThreadApcFlags : Uint4B
+   +0x250 LpcReceivedMsgIdValid : Pos 0, 1 Bit
+   +0x250 LpcExitThreadCalled : Pos 1, 1 Bit
+   +0x250 AddressSpaceOwner : Pos 2, 1 Bit
+   +0x254 ForwardClusterOnly : UChar
+   +0x255 DisablePageFaultClustering : UChar
+kd> dt -b _KTHREAD
+ntdll!_KTHREAD
+   +0x000 Header           : _DISPATCHER_HEADER
+      +0x000 Type             : UChar
+      +0x001 Absolute         : UChar
+      +0x002 Size             : UChar
+      +0x003 Inserted         : UChar
+      +0x004 SignalState      : Int4B
+      +0x008 WaitListHead     : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+   +0x010 MutantListHead   : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x018 InitialStack     : Ptr32 
+   +0x01c StackLimit       : Ptr32 
+   +0x020 Teb              : Ptr32 
+   +0x024 TlsArray         : Ptr32 
+   +0x028 KernelStack      : Ptr32 
+   +0x02c DebugActive      : UChar
+   +0x02d State            : UChar
+   +0x02e Alerted          : UChar
+   +0x030 Iopl             : UChar
+   +0x031 NpxState         : UChar
+   +0x032 Saturation       : Char
+   +0x033 Priority         : Char
+   +0x034 ApcState         : _KAPC_STATE
+      +0x000 ApcListHead      : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x010 Process          : Ptr32 
+      +0x014 KernelApcInProgress : UChar
+      +0x015 KernelApcPending : UChar
+      +0x016 UserApcPending   : UChar
+   +0x04c ContextSwitches  : Uint4B
+   +0x050 IdleSwapBlock    : UChar
+   +0x051 Spare0           : UChar
+   +0x054 WaitStatus       : Int4B
+   +0x058 WaitIrql         : UChar
+   +0x059 WaitMode         : Char
+   +0x05a WaitNext         : UChar
+   +0x05b WaitReason       : UChar
+   +0x05c WaitBlockList    : Ptr32 
+   +0x060 WaitListEntry    : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x060 SwapListEntry    : _SINGLE_LIST_ENTRY
+      +0x000 Next             : Ptr32 
+   +0x068 WaitTime         : Uint4B
+   +0x06c BasePriority     : Char
+   +0x06d DecrementCount   : UChar
+   +0x06e PriorityDecrement : Char
+   +0x06f Quantum          : Char
+   +0x070 WaitBlock        : _KWAIT_BLOCK
+      +0x000 WaitListEntry    : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x008 Thread           : Ptr32 
+      +0x00c Object           : Ptr32 
+      +0x010 NextWaitBlock    : Ptr32 
+      +0x014 WaitKey          : Uint2B
+      +0x016 WaitType         : Uint2B
+   +0x0d0 LegoData         : Ptr32 
+   +0x0d4 KernelApcDisable : Uint4B
+   +0x0d8 UserAffinity     : Uint4B
+   +0x0dc SystemAffinityActive : UChar
+   +0x0dd PowerState       : UChar
+   +0x0de NpxIrql          : UChar
+   +0x0df InitialNode      : UChar
+   +0x0e0 ServiceTable     : Ptr32 
+   +0x0e4 Queue            : Ptr32 
+   +0x0e8 ApcQueueLock     : Uint4B
+   +0x0f0 Timer            : _KTIMER
+      +0x000 Header           : _DISPATCHER_HEADER
+         +0x000 Type             : UChar
+         +0x001 Absolute         : UChar
+         +0x002 Size             : UChar
+         +0x003 Inserted         : UChar
+         +0x004 SignalState      : Int4B
+         +0x008 WaitListHead     : _LIST_ENTRY
+            +0x000 Flink            : Ptr32 
+            +0x004 Blink            : Ptr32 
+      +0x010 DueTime          : _ULARGE_INTEGER
+         +0x000 LowPart          : Uint4B
+         +0x004 HighPart         : Uint4B
+         +0x000 u                : __unnamed
+            +0x000 LowPart          : Uint4B
+            +0x004 HighPart         : Uint4B
+         +0x000 QuadPart         : Uint8B
+      +0x018 TimerListEntry   : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x020 Dpc              : Ptr32 
+      +0x024 Period           : Int4B
+   +0x118 QueueListEntry   : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x120 SoftAffinity     : Uint4B
+   +0x124 Affinity         : Uint4B
+   +0x128 Preempted        : UChar
+   +0x129 ProcessReadyQueue : UChar
+   +0x12a KernelStackResident : UChar
+   +0x12b NextProcessor    : UChar
+   +0x12c CallbackStack    : Ptr32 
+   +0x130 Win32Thread      : Ptr32 
+   +0x134 TrapFrame        : Ptr32 
+   +0x138 ApcStatePointer  : Ptr32 
+   +0x140 PreviousMode     : Char
+   +0x141 EnableStackSwap  : UChar
+   +0x142 LargeStack       : UChar
+   +0x143 ResourceIndex    : UChar
+   +0x144 KernelTime       : Uint4B
+   +0x148 UserTime         : Uint4B
+   +0x14c SavedApcState    : _KAPC_STATE
+      +0x000 ApcListHead      : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x010 Process          : Ptr32 
+      +0x014 KernelApcInProgress : UChar
+      +0x015 KernelApcPending : UChar
+      +0x016 UserApcPending   : UChar
+   +0x164 Alertable        : UChar
+   +0x165 ApcStateIndex    : UChar
+   +0x166 ApcQueueable     : UChar
+   +0x167 AutoAlignment    : UChar
+   +0x168 StackBase        : Ptr32 
+   +0x16c SuspendApc       : _KAPC
+      +0x000 Type             : Int2B
+      +0x002 Size             : Int2B
+      +0x004 Spare0           : Uint4B
+      +0x008 Thread           : Ptr32 
+      +0x00c ApcListEntry     : _LIST_ENTRY
+         +0x000 Flink            : Ptr32 
+         +0x004 Blink            : Ptr32 
+      +0x014 KernelRoutine    : Ptr32 
+      +0x018 RundownRoutine   : Ptr32 
+      +0x01c NormalRoutine    : Ptr32 
+      +0x020 NormalContext    : Ptr32 
+      +0x024 SystemArgument1  : Ptr32 
+      +0x028 SystemArgument2  : Ptr32 
+      +0x02c ApcStateIndex    : Char
+      +0x02d ApcMode          : Char
+      +0x02e Inserted         : UChar
+   +0x19c SuspendSemaphore : _KSEMAPHORE
+      +0x000 Header           : _DISPATCHER_HEADER
+         +0x000 Type             : UChar
+         +0x001 Absolute         : UChar
+         +0x002 Size             : UChar
+         +0x003 Inserted         : UChar
+         +0x004 SignalState      : Int4B
+         +0x008 WaitListHead     : _LIST_ENTRY
+            +0x000 Flink            : Ptr32 
+            +0x004 Blink            : Ptr32 
+      +0x010 Limit            : Int4B
+   +0x1b0 ThreadListEntry  : _LIST_ENTRY
+      +0x000 Flink            : Ptr32 
+      +0x004 Blink            : Ptr32 
+   +0x1b8 FreezeCount      : Char
+   +0x1b9 SuspendCount     : Char
+   +0x1ba IdealProcessor   : UChar
+   +0x1bb DisableBoost     : UChar
+kd> dt -t _TEB
+ntdll!_TEB
+   +0x000 NtTib            : _NT_TIB
+   +0x01c EnvironmentPointer : Ptr32 Void
+   +0x020 ClientId         : _CLIENT_ID
+   +0x028 ActiveRpcHandle  : Ptr32 Void
+   +0x02c ThreadLocalStoragePointer : Ptr32 Void
+   +0x030 ProcessEnvironmentBlock : Ptr32 _PEB
+   +0x034 LastErrorValue   : Uint4B
+   +0x038 CountOfOwnedCriticalSections : Uint4B
+   +0x03c CsrClientThread  : Ptr32 Void
+   +0x040 Win32ThreadInfo  : Ptr32 Void
+   +0x044 User32Reserved   : [26] Uint4B
+   +0x0ac UserReserved     : [5] Uint4B
+   +0x0c0 WOW32Reserved    : Ptr32 Void
+   +0x0c4 CurrentLocale    : Uint4B
+   +0x0c8 FpSoftwareStatusRegister : Uint4B
+   +0x0cc SystemReserved1  : [54] Ptr32 Void
+   +0x1a4 ExceptionCode    : Int4B
+   +0x1a8 ActivationContextStack : _ACTIVATION_CONTEXT_STACK
+   +0x1bc SpareBytes1      : [24] UChar
+   +0x1d4 GdiTebBatch      : _GDI_TEB_BATCH
+   +0x6b4 RealClientId     : _CLIENT_ID
+   +0x6bc GdiCachedProcessHandle : Ptr32 Void
+   +0x6c0 GdiClientPID     : Uint4B
+   +0x6c4 GdiClientTID     : Uint4B
+   +0x6c8 GdiThreadLocalInfo : Ptr32 Void
+   +0x6cc Win32ClientInfo  : [62] Uint4B
+   +0x7c4 glDispatchTable  : [233] Ptr32 Void
+   +0xb68 glReserved1      : [29] Uint4B
+   +0xbdc glReserved2      : Ptr32 Void
+   +0xbe0 glSectionInfo    : Ptr32 Void
+   +0xbe4 glSection        : Ptr32 Void
+   +0xbe8 glTable          : Ptr32 Void
+   +0xbec glCurrentRC      : Ptr32 Void
+   +0xbf0 glContext        : Ptr32 Void
+   +0xbf4 LastStatusValue  : Uint4B
+   +0xbf8 StaticUnicodeString : _UNICODE_STRING
+   +0xc00 StaticUnicodeBuffer : [261] Uint2B
+   +0xe0c DeallocationStack : Ptr32 Void
+   +0xe10 TlsSlots         : [64] Ptr32 Void
+   +0xf10 TlsLinks         : _LIST_ENTRY
+   +0xf18 Vdm              : Ptr32 Void
+   +0xf1c ReservedForNtRpc : Ptr32 Void
+   +0xf20 DbgSsReserved    : [2] Ptr32 Void
+   +0xf28 HardErrorsAreDisabled : Uint4B
+   +0xf2c Instrumentation  : [16] Ptr32 Void
+   +0xf6c WinSockData      : Ptr32 Void
+   +0xf70 GdiBatchCount    : Uint4B
+   +0xf74 InDbgPrint       : UChar
+   +0xf75 FreeStackOnTermination : UChar
+   +0xf76 HasFiberData     : UChar
+   +0xf77 IdealProcessor   : UChar
+   +0xf78 Spare3           : Uint4B
+   +0xf7c ReservedForPerf  : Ptr32 Void
+   +0xf80 ReservedForOle   : Ptr32 Void
+   +0xf84 WaitingOnLoaderLock : Uint4B
+   +0xf88 Wx86Thread       : _Wx86ThreadState
+   +0xf94 TlsExpansionSlots : Ptr32 Ptr32 Void
+   +0xf98 ImpersonationLocale : Uint4B
+   +0xf9c IsImpersonating  : Uint4B
+   +0xfa0 NlsCache         : Ptr32 Void
+   +0xfa4 pShimData        : Ptr32 Void
+   +0xfa8 HeapVirtualAffinity : Uint4B
+   +0xfac CurrentTransactionHandle : Ptr32 Void
+   +0xfb0 ActiveFrame      : Ptr32 _TEB_ACTIVE_FRAME
+   +0xfb4 SafeThunkCall    : UChar
+   +0xfb5 BooleanSpare     : [3] UChar
