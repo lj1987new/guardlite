@@ -310,3 +310,40 @@ BOOLEAN LDR_DATA_TABLE_ENTRY__BaseDllName(PVOID pLdr, PUNICODE_STRING* pDllName)
 	*pDllName = (PUNICODE_STRING)((char*)pLdr + nPos);
 	return TRUE;
 }
+
+//////////////////////////////////////////////////////////////////////////
+// 获取模块路径
+PVOID	GetModuleBaseAddress(PEPROCESS pEproc, PUNICODE_STRING pDllName)
+{
+	PPEB					pPeb;
+	PVOID					pLdr;
+	PLIST_ENTRY				pModules;
+	PLIST_ENTRY				pNext;
+	PVOID					pBaseAddr		= NULL;
+
+	if(FALSE == EPROCESS__PPEB(PsGetCurrentProcess(), &pPeb))
+		return NULL;
+	// 获取DLL链表
+	if(FALSE == PEB__Ldr(pPeb, &pLdr))
+		return NULL;
+	// 获取链表头
+	if(FALSE == PEB_LDR_DATA__InLoadOrderModuleList(pLdr, &pModules))
+		return NULL;
+	for(pNext = pModules->Flink; pNext != pModules; pNext = pNext->Flink)
+	{
+		PVOID				pLdrOne;
+		PUNICODE_STRING		pBaseName;
+
+		if(FALSE == CONTAINING_RECORD__LDR_DATA_TABLE(pNext, &pLdrOne))
+			continue;
+		if(FALSE == LDR_DATA_TABLE_ENTRY__BaseDllName(pLdrOne, &pBaseName))
+			continue;
+		if(0 != RtlCompareUnicodeString(pDllName, pBaseName, FALSE))
+			continue;
+		if(FALSE == LDR_DATA_TABLE_ENTRY__DllBase(pLdrOne, &pBaseAddr))
+			return NULL;
+		// 反回获取到的值
+		return pBaseName;
+	}
+	return NULL;
+}
