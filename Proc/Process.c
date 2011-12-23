@@ -16,9 +16,12 @@ ULONG	GetBuildNumber()
 	return ulBuild;
 }
 // 获取PEB结构
-BOOLEAN EPROCESS_PPEB(PEPROCESS pEproc, PPEB* pPeb)
+BOOLEAN EPROCESS__PPEB(PEPROCESS pEproc, PPEB* pPeb)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pEproc)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -36,9 +39,12 @@ BOOLEAN EPROCESS_PPEB(PEPROCESS pEproc, PPEB* pPeb)
 	return TRUE;
 }
 // 获取Imagebase地址
-BOOLEAN PEB_ImageBaseAddress(PPEB pPeb, PVOID* pBase)
+BOOLEAN PEB__ImageBaseAddress(PPEB pPeb, PVOID* pBase)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pPeb)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -54,9 +60,12 @@ BOOLEAN PEB_ImageBaseAddress(PPEB pPeb, PVOID* pBase)
 	return TRUE;
 }
 // 获取Ldr _PEB_LDR_DATA
-BOOLEAN PEB_Ldr(PPEB pPeb, PVOID* pLdr)
+BOOLEAN PEB__Ldr(PPEB pPeb, PVOID* pLdr)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pPeb)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -72,9 +81,12 @@ BOOLEAN PEB_Ldr(PPEB pPeb, PVOID* pLdr)
 	return TRUE;
 }
 // 获取PEB->ProcessParameters
-BOOLEAN PEB_ProcessParameters(PPEB pPeb, PVOID* pParam)
+BOOLEAN PEB__ProcessParameters(PPEB pPeb, PVOID* pParam)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pPeb)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -90,9 +102,12 @@ BOOLEAN PEB_ProcessParameters(PPEB pPeb, PVOID* pParam)
 	return TRUE;
 }
 
-BOOLEAN RTL_USER_PROCESS_PARAMETERS_DllPath(PVOID pParam, PUNICODE_STRING* pDllPath)
+BOOLEAN RTL_USER_PROCESS_PARAMETERS__DllPath(PVOID pParam, PUNICODE_STRING* pDllPath)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pParam)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -108,9 +123,12 @@ BOOLEAN RTL_USER_PROCESS_PARAMETERS_DllPath(PVOID pParam, PUNICODE_STRING* pDllP
 	return TRUE;
 }
 
-BOOLEAN RTL_USER_PROCESS_PARAMETERS_ImagePathName(PVOID pParam, PUNICODE_STRING* pPathName)
+BOOLEAN RTL_USER_PROCESS_PARAMETERS__ImagePathName(PVOID pParam, PUNICODE_STRING* pPathName)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pParam)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -126,9 +144,12 @@ BOOLEAN RTL_USER_PROCESS_PARAMETERS_ImagePathName(PVOID pParam, PUNICODE_STRING*
 	return TRUE;
 }
 
-BOOLEAN RTL_USER_PROCESS_PARAMETERS_CommandLine(PVOID pParam, PUNICODE_STRING* pCommandLine)
+BOOLEAN RTL_USER_PROCESS_PARAMETERS__CommandLine(PVOID pParam, PUNICODE_STRING* pCommandLine)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pParam)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -144,9 +165,12 @@ BOOLEAN RTL_USER_PROCESS_PARAMETERS_CommandLine(PVOID pParam, PUNICODE_STRING* p
 	return TRUE;
 }
 // 获取PEB->Ldr->InLoadOrderModuleList
-BOOLEAN PEB_LDR_DATA_InLoadOrderModuleList(PVOID pLdr, PLIST_ENTRY* pEntry)
+BOOLEAN PEB_LDR_DATA__InLoadOrderModuleList(PVOID pLdr, PLIST_ENTRY* pEntry)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pLdr)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -161,9 +185,12 @@ BOOLEAN PEB_LDR_DATA_InLoadOrderModuleList(PVOID pLdr, PLIST_ENTRY* pEntry)
 	*pEntry = (PLIST_ENTRY)((char*)pLdr + nPos);
 	return TRUE;
 }
-BOOLEAN LDR_DATA_TABLEFromInLoadOrderModuleList(PVOID pInload, PVOID* pLdr)
+BOOLEAN CONTAINING_RECORD__LDR_DATA_TABLE(PVOID pInload, PVOID* pLdr)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pInload)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -179,9 +206,12 @@ BOOLEAN LDR_DATA_TABLEFromInLoadOrderModuleList(PVOID pInload, PVOID* pLdr)
 	return TRUE;
 }
 
-BOOLEAN LDR_DATA_TABLE_DllBase(PVOID pLdr, PVOID* pBase)
+BOOLEAN LDR_DATA_TABLE_ENTRY__DllBase(PVOID pLdr, PVOID* pBase)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pLdr)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -197,9 +227,12 @@ BOOLEAN LDR_DATA_TABLE_DllBase(PVOID pLdr, PVOID* pBase)
 	return TRUE;
 }
 
-BOOLEAN LDR_DATA_TABLE_EntryPoint(PVOID pLdr, PVOID* pPoint)
+BOOLEAN LDR_DATA_TABLE_ENTRY__EntryPoint(PVOID pLdr, PVOID* pPoint)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pLdr)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -215,9 +248,12 @@ BOOLEAN LDR_DATA_TABLE_EntryPoint(PVOID pLdr, PVOID* pPoint)
 	return TRUE;
 }
 
-BOOLEAN LDR_DATA_TABLE_SizeOfImage(PVOID pLdr, UINT32* pSize)
+BOOLEAN LDR_DATA_TABLE_ENTRY__SizeOfImage(PVOID pLdr, UINT32* pSize)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pLdr)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -233,9 +269,12 @@ BOOLEAN LDR_DATA_TABLE_SizeOfImage(PVOID pLdr, UINT32* pSize)
 	return TRUE;
 }
 
-BOOLEAN LDR_DATA_TABLE_FullDllName(PVOID pLdr, PUNICODE_STRING* pFullName)
+BOOLEAN LDR_DATA_TABLE_ENTRY__FullDllName(PVOID pLdr, PUNICODE_STRING* pFullName)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pLdr)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{
@@ -251,9 +290,12 @@ BOOLEAN LDR_DATA_TABLE_FullDllName(PVOID pLdr, PUNICODE_STRING* pFullName)
 	return TRUE;
 }
 
-BOOLEAN LDR_DATA_TABLE_BaseDllName(PVOID pLdr, PUNICODE_STRING* pDllName)
+BOOLEAN LDR_DATA_TABLE_ENTRY__BaseDllName(PVOID pLdr, PUNICODE_STRING* pDllName)
 {
 	ULONG			nPos	= 0;
+
+	if(NULL == pLdr)
+		return FALSE;
 
 	switch(GetBuildNumber())
 	{

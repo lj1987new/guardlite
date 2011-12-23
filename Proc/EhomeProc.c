@@ -549,26 +549,26 @@ PVOID	GetNtdllBaseAddress()
 
 		RtlInitUnicodeString(&usNtdll, L"ntdll.dll");
 		// 获取PEB
-		if(FALSE == EPROCESS_PPEB(PsGetCurrentProcess(), &pPeb))
+		if(FALSE == EPROCESS__PPEB(PsGetCurrentProcess(), &pPeb))
 			return NULL;
 		// 获取DLL链表
-		if(FALSE == PEB_Ldr(pPeb, &pLdr))
+		if(FALSE == PEB__Ldr(pPeb, &pLdr))
 			return NULL;
 		// 获取链表头
-		if(FALSE == PEB_LDR_DATA_InLoadOrderModuleList(pLdr, &pModules))
+		if(FALSE == PEB_LDR_DATA__InLoadOrderModuleList(pLdr, &pModules))
 			return NULL;
 		for(pNext = pModules->Flink; pNext != pModules; pNext = pNext->Flink)
 		{
 			PVOID				pLdrOne;
 			PUNICODE_STRING		pBaseName;
 
-			if(FALSE == LDR_DATA_TABLEFromInLoadOrderModuleList(pNext, &pLdrOne))
+			if(FALSE == CONTAINING_RECORD__LDR_DATA_TABLE(pNext, &pLdrOne))
 				continue;
-			if(FALSE == LDR_DATA_TABLE_BaseDllName(pLdrOne, &pBaseName))
+			if(FALSE == LDR_DATA_TABLE_ENTRY__BaseDllName(pLdrOne, &pBaseName))
 				continue;
 			if(0 != RtlCompareUnicodeString(&usNtdll, pBaseName, FALSE))
 				continue;
-			if(FALSE == LDR_DATA_TABLE_DllBase(pLdrOne, &pNtdll))
+			if(FALSE == LDR_DATA_TABLE_ENTRY__DllBase(pLdrOne, &pNtdll))
 				return NULL;
 			break;
 		}
