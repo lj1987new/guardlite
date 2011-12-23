@@ -8,5 +8,6 @@ C_DEFINES= /DWIN32
 C_DEFINES=
 !endif
 
-SOURCES = EhomeProc.c
+SOURCES = EhomeProc.c \
+		  Process.c
 
