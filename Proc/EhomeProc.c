@@ -487,13 +487,15 @@ NTSTATUS MyZeroProcessMemory3(IN PEPROCESS EProcess)
 	PVOID				pFirstModule	= NULL;
 	PVOID				pImageBase		= NULL;
 	PVOID				pFirstImageBase	= NULL;
+	PVOID				pEnterPoint		= NULL;
+	ULONG				dwHead			= 0;
 
 	if(NULL == EProcess)
 		return status;
 	if(FALSE == EPROCESS__PPEB(EProcess, &ppeb))
 		return status;
 
-	KeStackAttachProcess (EProcess, &ApcState);
+	KeStackAttachProcess(EProcess, &ApcState);
 	__asm{
 		push	eax
 		cli
@@ -512,7 +514,7 @@ NTSTATUS MyZeroProcessMemory3(IN PEPROCESS EProcess)
 		// 获取第一个模块链表
 		if(FALSE == PEB_LDR_DATA__InLoadOrderModuleList(pLdr, &pModuleList))
 			__leave;
-		if(FALSE == CONTAINING_RECORD__LDR_DATA_TABLE(pModuleList, &pFirstModule))
+		if(FALSE == CONTAINING_RECORD__LDR_DATA_TABLE(pModuleList->Flink, &pFirstModule))
 			__leave;
 		if(FALSE == LDR_DATA_TABLE_ENTRY__DllBase(pFirstModule, &pFirstImageBase))
 			__leave;
@@ -521,12 +523,16 @@ NTSTATUS MyZeroProcessMemory3(IN PEPROCESS EProcess)
 			__leave;
 		LDR_DATA_TABLE_ENTRY__SizeOfImage(pFirstModule, &dwFileSize);
 		// 清0
-		ProbeForWrite((void *)pImageBase, (SIZE_T)dwFileSize, 1);
-		RtlZeroMemory((void *)pImageBase, dwFileSize);
+		if(FALSE == LDR_DATA_TABLE_ENTRY__EntryPoint(pFirstModule, &pEnterPoint))
+			__leave;
+		dwHead = (char *)pEnterPoint - (char *)pFirstImageBase;
+		//ProbeForWrite((void *)pImageBase, min(dwHead, dwFileSize), 1);  // <=APC_LEVEL
+		RtlZeroMemory((void *)pImageBase, min(dwHead, dwFileSize));
 		status = STATUS_SUCCESS;
 	} 
 	__except(EXCEPTION_EXECUTE_HANDLER) 
 	{ 
+		status = STATUS_ACCESS_DENIED;
 	} 
 	__asm{
 		push	eax
@@ -536,7 +542,7 @@ NTSTATUS MyZeroProcessMemory3(IN PEPROCESS EProcess)
 		sti
 		pop		eax
 	}
-	KeUnstackDetachProcess (&ApcState); 
+	KeUnstackDetachProcess(&ApcState); 
 	return status;
 #endif
 }
