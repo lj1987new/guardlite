@@ -6,6 +6,7 @@
 
 // ªÒ»°PEB
 BOOLEAN EPROCESS__PPEB(PEPROCESS pEproc, PPEB* pPeb);
+BOOLEAN EPROCESS__ThreadListHead(PEPROCESS pEproc, PLIST_ENTRY* pThreadList);
 
 // _PEB
 BOOLEAN PEB__ImageBaseAddress(PPEB pPeb, PVOID* pBase);
@@ -30,5 +31,11 @@ BOOLEAN LDR_DATA_TABLE_ENTRY__BaseDllName(PVOID pLdr, PUNICODE_STRING* pDllName)
 
 // Module
 PVOID	GetModuleBaseAddress(PEPROCESS pEproc, PUNICODE_STRING pDllName);
+
+// _KTHREAD
+BOOLEAN CONTAINING_RECORD__ETHREAD(PVOID pEntery, PETHREAD* pEThread);
+BOOLEAN ETHREAD__Tcb(PETHREAD EThread, PKTHREAD* pTcb);
+BOOLEAN KTHREAD__SuspendCount(PKTHREAD pTcb, PCHAR* pSuspendCount);
+BOOLEAN KTHREAD__SuspendApc(PKTHREAD pTcb, PKAPC* pSuspendApc);
 
 #endif //#ifndef _PROCESS_HANDLE_

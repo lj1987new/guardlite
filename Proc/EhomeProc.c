@@ -14,15 +14,17 @@
 
 
 //NTSTATUS PsLookupProcessByProcessId(IN   HANDLE   ulProcId,   OUT   PEPROCESS   *   pEProcess);
-NTSTATUS ZwQueryInformationProcess(HANDLE ProcessHandle, PROCESSINFOCLASS ProcessInformationClass
+NTSTATUS	ZwQueryInformationProcess(HANDLE ProcessHandle, PROCESSINFOCLASS ProcessInformationClass
 										  , PVOID ProcessInformation, ULONG ProcessInformationLength
 										  ,	PULONG ReturnLength);
 NTSTATUS	GetProcessFullName(HANDLE hPid, WCHAR* pPath, LONG nLen);
 NTSTATUS	GetProcessFullName3(HANDLE hPid, WCHAR* pPath, LONG nLen);
-NTSTATUS	KillProcess(ULONG64 nPID);
+NTSTATUS	MyKillProcess(ULONG64 nPID);
 NTSTATUS	MmUnmapViewOfSection(IN PEPROCESS Process, IN PVOID BaseAddress);
-NTSTATUS	InjectionCodetoProcess(HANDLE ProcessID, PEPROCESS Epro);
 PVOID		GetNtdllBaseAddress();
+NTSTATUS	MySuspendProcess(IN PEPROCESS Process);
+NTKERNELAPI BOOLEAN  KeInsertQueueApc(PKAPC Apc, PVOID SystemArgument1
+									   , PVOID SystemArgument2, KPRIORITY Increment);  
 
 typedef struct _CallbackInfoList{
 	LIST_ENTRY			ListEntry;
@@ -230,7 +232,7 @@ NTSTATUS DispatchIoctl(PDEVICE_OBJECT pDevObj, PIRP pIrp)
 		{
 			if(8 <= uInSize)
 			{
-				status = KillProcess(*(PULONG64)inbuf);
+				status = MyKillProcess(*(PULONG64)inbuf);
 			}
 			break;
 		}
@@ -281,6 +283,8 @@ VOID ProcessCallback(IN HANDLE  hParentId, IN HANDLE  hProcessId, IN BOOLEAN bCr
 			
 			KeDetachProcess();
 			// InjectionCodetoProcess(hProcessId, Epro);
+			if(bCreate)
+				MySuspendProcess(Epro);
 			if(0 == status)
 			{
 				wcsncpy(pcbInfo->cbInfo.szImagePath, szImageName, 260);
@@ -293,18 +297,6 @@ VOID ProcessCallback(IN HANDLE  hParentId, IN HANDLE  hProcessId, IN BOOLEAN bCr
 			KdPrint(("Find one ProcEvent: %I64d, %I64d, %S, %d\n", (__int64)hProcessId, (__int64)hParentId, pcbInfo->cbInfo.szImagePath, bCreate));
 		}
 
-// 	    KeWaitForSingleObject(nameMutex,Executive,KernelMode,FALSE,NULL);
-//         pDevExt->hPParentId  = (__int64)hParentId;
-//         pDevExt->hPProcessId = (__int64)hProcessId;
-//         pDevExt->bPCreate    = bCreate;
-// 	    
-// 
-// 
-// 	
-// 	    strcpy(pDevExt->proname,(char*)Epro+NamePos);
-// 	    KeReleaseMutex(nameMutex,FALSE);
-
-// 	    KdPrint(("process is:%s  %d\n",pDevExt->proname,bCreate));
         KeSetEvent(pDevExt->ProcessEvent, 0, FALSE);
 	}
 	KdPrint(("Leave Processcallback\n"));
@@ -473,80 +465,6 @@ NTSTATUS GetProcessFullName3(HANDLE hPid, WCHAR* pPath, LONG nLen)
 	return status;
 }
 
-NTSTATUS MyZeroProcessMemory3(IN PEPROCESS EProcess) 
-{
-#if !defined(WIN32)
-	return -5;	// 拒绝访问
-#else
-	KAPC_STATE			ApcState;
-	NTSTATUS			status			= -5; 
-	ULONG				dwFileSize		= 0;
-	PPEB				ppeb			= NULL;
-	PVOID				pLdr			= NULL;
-	PLIST_ENTRY			pModuleList		= NULL;
-	PVOID				pFirstModule	= NULL;
-	PVOID				pImageBase		= NULL;
-	PVOID				pFirstImageBase	= NULL;
-	PVOID				pEnterPoint		= NULL;
-	ULONG				dwHead			= 0;
-
-	if(NULL == EProcess)
-		return status;
-	if(FALSE == EPROCESS__PPEB(EProcess, &ppeb))
-		return status;
-
-	KeStackAttachProcess(EProcess, &ApcState);
-	__asm{
-		push	eax
-		cli
-		mov		eax, cr0
-		and		eax, not 10000h  ;清除cr0的WP位
-		mov		cr0, eax
-		pop		eax
-	}
-	__try { 
-		// 获取基址
-		if(FALSE == PEB__ImageBaseAddress(ppeb, &pImageBase))
-			__leave;
-		// 获取Dll链表
-		if(FALSE == PEB__Ldr(ppeb, &pLdr))
-			__leave;
-		// 获取第一个模块链表
-		if(FALSE == PEB_LDR_DATA__InLoadOrderModuleList(pLdr, &pModuleList))
-			__leave;
-		if(FALSE == CONTAINING_RECORD__LDR_DATA_TABLE(pModuleList->Flink, &pFirstModule))
-			__leave;
-		if(FALSE == LDR_DATA_TABLE_ENTRY__DllBase(pFirstModule, &pFirstImageBase))
-			__leave;
-		// 获取模块基址
-		if(pImageBase != pFirstImageBase)
-			__leave;
-		LDR_DATA_TABLE_ENTRY__SizeOfImage(pFirstModule, &dwFileSize);
-		// 清0
-		if(FALSE == LDR_DATA_TABLE_ENTRY__EntryPoint(pFirstModule, &pEnterPoint))
-			__leave;
-		dwHead = (char *)pEnterPoint - (char *)pFirstImageBase;
-		//ProbeForWrite((void *)pImageBase, min(dwHead, dwFileSize), 1);  // <=APC_LEVEL
-		RtlZeroMemory((void *)pImageBase, min(dwHead, dwFileSize));
-		status = STATUS_SUCCESS;
-	} 
-	__except(EXCEPTION_EXECUTE_HANDLER) 
-	{ 
-		status = STATUS_ACCESS_DENIED;
-	} 
-	__asm{
-		push	eax
-		mov		eax, cr0
-		or		eax, 10000h  ;恢复cr0的WP位
-		mov		cr0, eax
-		sti
-		pop		eax
-	}
-	KeUnstackDetachProcess(&ApcState); 
-	return status;
-#endif
-}
-
 PVOID	GetNtdllBaseAddress()
 {
 	static PVOID		pNtdll		= NULL;
@@ -563,7 +481,7 @@ PVOID	GetNtdllBaseAddress()
 }
 
 // 结束进程
-NTSTATUS	KillProcess(ULONG64 nPID)
+NTSTATUS	MyKillProcess(ULONG64 nPID)
 {
 	PEPROCESS						Epro;
 	NTSTATUS						status;
@@ -579,231 +497,49 @@ NTSTATUS	KillProcess(ULONG64 nPID)
 	objattr.Length = sizeof(objattr);
 	cid.UniqueProcess = (HANDLE)nPID;
  	// 普通的结束方法
-//   	KeAttachProcess(Epro);
-//  	status = ZwTerminateProcess(NULL, 1);
-//  	KeDetachProcess();
-//  
-//  	// 加强的结束方法
-//  	if(!NT_SUCCESS(status))
-//  	{
-//  		KAPC_STATE			ApcState;
-//  		NTSTATUS			sttemp;
-//  
-//  		KeStackAttachProcess(Epro, &ApcState);
-//  		sttemp = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objattr, &cid);
-//  		if(NT_SUCCESS(sttemp))
-//  		{
-//  			status = ZwTerminateProcess(hProcess, 1);
-//  			ZwClose(hProcess);
-//  		}
-//  		KeUnstackDetachProcess(&ApcState);
-//  	}
-// 
-// 	// 卸出ntdll方法
-// 	if(!NT_SUCCESS(status))
-// 	{
-// 		//0x7c920000是ntdll.dll的基址, 经测试XP下可以结束360
-// 		status = MmUnmapViewOfSection(Epro, (PVOID)GetNtdllBaseAddress());
-// 		KdPrint(("!!!EHomeProc.sys KillProcess us unload ntdll.dll: %x.\n", status));
-// 	}
-// 	if(NT_SUCCESS(status))
-// 	{
-// 		ObDereferenceObject(Epro);
-// 		return status;
-// 	}
-// 	KdPrint(("!!!EHomeProc.sys KillProcess us zero memory.\n"));
-	// 如果以上两种方法都不行， 就出最具破坏力的办法，内存清0结束法
-	status = MyZeroProcessMemory3(Epro);
+  	KeAttachProcess(Epro);
+ 	status = ZwTerminateProcess(NULL, 1);
+ 	KeDetachProcess();
+	// 卸出ntdll方法
+	if(!NT_SUCCESS(status))
+	{
+		//0x7c920000是ntdll.dll的基址, 经测试XP下可以结束360
+		status = MmUnmapViewOfSection(Epro, (PVOID)GetNtdllBaseAddress());
+		KdPrint(("!!!EHomeProc.sys MyKillProcess us unload ntdll.dll: %x.\n", status));
+	}
 	ObDereferenceObject(Epro);
-	// 清理工作
 	return status;
 }
-// 获取起始地址
-NTSTATUS GetProcessStartBase(PPEB peb, PVOID* pEnterPoint, USHORT* pMachine)
+// 暂停线程
+NTSTATUS	MySuspendProcess(IN PEPROCESS Process)
 {
-	UCHAR*		pImageBase		= NULL;
-	UCHAR*		pNtHeader		= NULL;
+	PLIST_ENTRY			pThreadList		= NULL;
+	PETHREAD			pEThread		= NULL;
+	PKTHREAD			pTcb			= NULL;
+	PCHAR				pSuspendCount	= NULL;
+	PKAPC				pSuspendApc		= NULL;
 
-	// 找到ImageBase
-	pImageBase = (UCHAR*)*( (ULONG32 *)((char*)peb + 0x8) );
-	if( 'ZM' != *((USHORT*)pImageBase) )
-		return STATUS_INVALID_ADDRESS;	// 验证是不是PE文件
-	// 找到IMAGE_NT_HEADER地址
-	pNtHeader = (UCHAR *)( (UCHAR*)pImageBase + *((ULONG32 *)((char *)pImageBase + 0x3C)) );
-	if( 'EP' != *((USHORT*)pNtHeader) )
-		return STATUS_INVALID_ADDRESS;	// 验证是不是NT文件
-	// 判断是64位，还是32位
-	*pMachine = *((USHORT *)(pNtHeader + 4));
-	if( 0x014c/*IMAGE_FILE_MACHINE_I386*/ == *pMachine )
+	// 获取相关变量
+	if(FALSE == EPROCESS__ThreadListHead(Process, &pThreadList))
+		return STATUS_ACCESS_DENIED;
+	if(FALSE == CONTAINING_RECORD__ETHREAD(pThreadList->Flink, &pEThread))
+		return STATUS_ACCESS_DENIED;
+	if(FALSE == ETHREAD__Tcb(pEThread, &pTcb))
+		return STATUS_ACCESS_DENIED;
+	if(FALSE == KTHREAD__SuspendCount(pTcb, &pSuspendCount))
+		return STATUS_ACCESS_DENIED;
+	if(FALSE == KTHREAD__SuspendApc(pTcb, &pSuspendApc))
+		return STATUS_ACCESS_DENIED;
+	// 开始暂停
+	(*pSuspendCount)++;
+	if(!pSuspendApc->Inserted)
 	{
-		// 32位
-		*pEnterPoint = (void *)( (UCHAR*)pImageBase + *((ULONG32 *)((char*)pNtHeader + 0x28)) );
-	}
-	else if( 0x8664/*IMAGE_FILE_MACHINE_AMD64*/ == *pMachine )
-	{
-		// AMD64位
-		*pEnterPoint = (void *)( (UCHAR*)pImageBase + *((ULONG64 *)((char*)pNtHeader + 0x28)) );
-	}
-	else
-	{
-		return STATUS_NOT_SUPPORTED;	// 尚不支持
-	}
-
-	return 0;
-}
-// 插入代码到起始地址
-NTSTATUS InjectionCodetoImageBase(HANDLE hProcess, void* pStartBase, USHORT wMachine)
-{
-	UCHAR*				pNewCode					= NULL;
-	NTSTATUS			status;
-	SIZE_T				nCodeSize					= 1024;
-	UCHAR*				pStartCode					= NULL;
-
-	if((0x14c != wMachine && 0x8664 != wMachine) || NULL == pStartBase)
-		return STATUS_NOT_SUPPORTED;
-	// 分配空间
-	status = ZwAllocateVirtualMemory(NULL/*hProcess*/, (PVOID *)&pNewCode, 0,
-		&nCodeSize, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-	if(!NT_SUCCESS(status))
-	{
-		status = ZwAllocateVirtualMemory(hProcess, (PVOID *)&pNewCode, 0,
-			&nCodeSize, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-	}
-	if(!NT_SUCCESS(status))
-	{
-		return status;
-	}
-	RtlZeroMemory(pNewCode, 1024);
-	RtlCopyMemory(pNewCode, pStartBase, 16);
-	// 写入代码
-	if( 0x014c/*IMAGE_FILE_MACHINE_I386*/ == wMachine )
-	{
-		// 32位
-		pStartCode = pNewCode + 16;
-		// 设置原转跳地址
-		*((UCHAR *)pStartBase) = 0xE9;	// JMP
-		*((ULONG32 *)((UCHAR*)pStartBase+1)) = (ULONG32)pStartCode - (ULONG32)5 - (ULONG32)pStartBase;
-		// 写目录代码
-		*((UCHAR *)pStartCode) = 0xF4;	// nop
-		*((UCHAR *)pStartCode + 1) = 0xE9; // JMP
-		*((ULONG32 *)(pStartCode + 2)) = (ULONG32)pStartCode - (ULONG32)5 - (ULONG32)(pStartCode + 1);
-		*((ULONG32 *)(pStartCode + 6)) = 0xcc; //int 3
-		*((ULONG32 *)(pStartCode + 7)) = 0xcc; //int 3
-		*((ULONG32 *)(pStartCode + 8)) = 0xcc; //int 3
-		// 跳回原地址
-		pStartCode = pNewCode + 32;
-		*((UCHAR *)pStartCode) = 0xE9; // JMP
-		*((ULONG32 *)(pStartCode + 1)) = (ULONG32)pStartBase - (ULONG32)5 - (ULONG32)pStartCode;   
-	}
-	else if( 0x8664/*IMAGE_FILE_MACHINE_AMD64*/ == wMachine )
-	{
-		// AMD64位
-	}
-
-	return STATUS_NOT_SUPPORTED;
-}
-// 插入代码到起始地址
-NTSTATUS InjectionCodetoImageBase2(HANDLE hProcess, HANDLE SectionHandle)
-{
-	UCHAR*				pNewCode					= NULL;
-	NTSTATUS			status;
-	SIZE_T				nCodeSize					= 1024;
-	UCHAR*				pStartCode					= NULL;
-	UCHAR*				ImageBase					= NULL;
-	SIZE_T				ViewSize					= 0;
-
-	if(NULL == SectionHandle)
-		return STATUS_OBJECT_PATH_NOT_FOUND;
-	// 加载Section
-	status = ZwMapViewOfSection(SectionHandle, hProcess
-		, (PVOID*)&ImageBase, 0, 0, NULL
-		, &ViewSize, ViewShare, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-
-	return status;
-}
-// 注入DLL到进程
-NTSTATUS InjectionCodetoProcess(HANDLE ProcessID, PEPROCESS Epro)
-{
-	HANDLE							hProcess		= NULL;
-	OBJECT_ATTRIBUTES				objattr			= {0};
-	CLIENT_ID						cid				= {0};
-	NTSTATUS						status			= STATUS_NOT_SUPPORTED;
-	PROCESS_BASIC_INFORMATION		pbinfo			= {0};
-	UCHAR*							pStartBase		= NULL;	
-	KAPC_STATE						ApcState;
-	USHORT							wMachine		= 0;
-	static HANDLE					SectionHandle	= NULL;
-
-	objattr.Length = sizeof(objattr);
-	cid.UniqueProcess = ProcessID;
-	// 加载SectionHandle
-	if(NULL == SectionHandle)
-	{
-		OBJECT_ATTRIBUTES			object;
-		UNICODE_STRING				usDll;
-		HANDLE						FileHandle			= NULL;
-		IO_STATUS_BLOCK				Iosb				= {0};
-
-		// 打开文件
-		RtlInitUnicodeString(&usDll, L"\\??\\c:\\ehome.dll");
-		InitializeObjectAttributes(&object, &usDll, OBJ_CASE_INSENSITIVE, NULL, NULL);
-		status = ZwOpenFile(&FileHandle, FILE_READ_ACCESS
-			, &object, &Iosb, FILE_SHARE_READ
-			, FILE_SYNCHRONOUS_IO_NONALERT);
-		if(!NT_SUCCESS(status))
-			return status;
-		// 加载到内核
-		status = ZwCreateSection(&SectionHandle, SECTION_ALL_ACCESS
-			, NULL,	NULL, PAGE_READWRITE, 0x1000000/*SEC_IMAGE*/ /*| 0x8000000SEC_COMMIT*/
-			, FileHandle);
-		ZwClose(FileHandle);
-		if(!NT_SUCCESS(status))
+		if(!KeInsertQueueApc(pSuspendApc, NULL, NULL, IO_NO_INCREMENT))
 		{
-			SectionHandle = NULL;
-			return status;
+			(*pSuspendCount)--;
+			return STATUS_ACCESS_DENIED;
 		}
 	}
-	// 附加到进程
-	KeStackAttachProcess (Epro, &ApcState);
-	status = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objattr, &cid);
-	if(!NT_SUCCESS(status))
-	{
-		KeUnstackDetachProcess (&ApcState);
-		return status;
-	}
-	// 查询信息
-	status = ZwQueryInformationProcess(hProcess, ProcessBasicInformation, &pbinfo, sizeof(pbinfo), NULL);
-	// 找到起始代码
-	status = GetProcessStartBase(pbinfo.PebBaseAddress, (PVOID *)&pStartBase, &wMachine);
-	if(0 == status)
-	{
-		__asm{
-			push	eax
-			cli
-			mov		eax, cr0
-			and		eax, not 10000h  ;清除cr0的WP位
-			mov		cr0, eax
-			pop		eax
-		}
-//		status = InjectionCodetoImageBase(hProcess, pStartBase, wMachine);
-		status = InjectionCodetoImageBase2(hProcess, SectionHandle);
-		__asm{
-			push	eax
-			mov		eax, cr0
-			or		eax, 10000h  ;恢复cr0的WP位
-			mov		cr0, eax
-			sti
-			pop		eax
-		}
-	}
-	ZwClose(hProcess);
-	// 离开进程
-	KeUnstackDetachProcess (&ApcState);
-	if(!NT_SUCCESS(status))
-	{
-		status = ZwOpenProcess(&hProcess, PROCESS_ALL_ACCESS, &objattr, &cid);
-		status = InjectionCodetoImageBase2(hProcess, SectionHandle);
-		ZwClose(hProcess);
-	}
-	return status;
+
+	return STATUS_SUCCESS;
 }
