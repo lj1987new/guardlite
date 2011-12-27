@@ -49,6 +49,9 @@ BOOLEAN EPROCESS__ThreadListHead(PEPROCESS pEproc, PLIST_ENTRY* pThreadList)
 	case 2600: // Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 		nPos = 0x190;
 		break;
+	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
+		nPos = 0x188;
+		break;
 	default:
 		return FALSE;
 	}
@@ -379,6 +382,9 @@ BOOLEAN CONTAINING_RECORD__ETHREAD(PVOID pEntery, PETHREAD* pEThread)
 	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 		nPos = -0x22c;
 		break;
+	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
+		nPos = -0x268;
+		break;
 	default:
 		return FALSE;
 	}
@@ -396,6 +402,9 @@ BOOLEAN ETHREAD__Tcb(PETHREAD EThread, PKTHREAD* pTcb)
 	switch(GetBuildNumber())
 	{
 	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
+		nPos = 0x0;
+		break;
+	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
 		nPos = 0x0;
 		break;
 	default:
@@ -417,6 +426,9 @@ BOOLEAN KTHREAD__SuspendCount(PKTHREAD pTcb, PCHAR* pSuspendCount)
 	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 		nPos = 0x1b9;
 		break;
+	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
+		nPos = 0x188;
+		break;
 	default:
 		return FALSE;
 	}
@@ -435,6 +447,9 @@ BOOLEAN KTHREAD__SuspendApc(PKTHREAD pTcb, PKAPC* pSuspendApc)
 	{
 	case 2600:	// Windows XP Kernel Version 2600 (Service Pack 2) UP Free x86 compatible
 		nPos = 0x16c;
+		break;
+	case 7600: // Windows 7 Kernel Version 7600 MP (1 procs) Free x86 compatible
+		nPos = 0x194;
 		break;
 	default:
 		return FALSE;
