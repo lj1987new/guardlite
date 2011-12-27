@@ -363,7 +363,7 @@ PVOID	GetModuleBaseAddress(PEPROCESS pEproc, PUNICODE_STRING pDllName)
 		if(FALSE == LDR_DATA_TABLE_ENTRY__DllBase(pLdrOne, &pBaseAddr))
 			return NULL;
 		// 反回获取到的值
-		return pBaseName;
+		return pBaseAddr;
 	}
 	return NULL;
 }
