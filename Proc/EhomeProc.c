@@ -14,17 +14,30 @@
 
 
 //NTSTATUS PsLookupProcessByProcessId(IN   HANDLE   ulProcId,   OUT   PEPROCESS   *   pEProcess);
+// 系统导出，未申名函数
 NTSTATUS	ZwQueryInformationProcess(HANDLE ProcessHandle, PROCESSINFOCLASS ProcessInformationClass
 										  , PVOID ProcessInformation, ULONG ProcessInformationLength
 										  ,	PULONG ReturnLength);
+NTKERNELAPI BOOLEAN  KeInsertQueueApc(PKAPC Apc, PVOID SystemArgument1
+									  , PVOID SystemArgument2, KPRIORITY Increment);  
+typedef enum _KAPC_ENVIRONMENT {
+	OriginalApcEnvironment,
+	AttachedApcEnvironment,
+	CurrentApcEnvironment
+} KAPC_ENVIRONMENT;
+NTKERNELAPI VOID KeInitializeApc (IN PRKAPC Apc, IN PKTHREAD Thread, IN KAPC_ENVIRONMENT Environment
+								  , IN PKKERNEL_ROUTINE KernelRoutine, IN PKRUNDOWN_ROUTINE RundownRoutine OPTIONAL
+								  , IN PKNORMAL_ROUTINE NormalRoutine OPTIONAL, IN KPROCESSOR_MODE ApcMode
+								  , IN PVOID NormalContext);
+// 自定义函数
 NTSTATUS	GetProcessFullName(HANDLE hPid, WCHAR* pPath, LONG nLen);
 NTSTATUS	GetProcessFullName3(HANDLE hPid, WCHAR* pPath, LONG nLen);
 NTSTATUS	MyKillProcess(ULONG64 nPID);
 NTSTATUS	MmUnmapViewOfSection(IN PEPROCESS Process, IN PVOID BaseAddress);
 PVOID		GetNtdllBaseAddress();
 NTSTATUS	MySuspendProcess(IN PEPROCESS Process);
-NTKERNELAPI BOOLEAN  KeInsertQueueApc(PKAPC Apc, PVOID SystemArgument1
-									   , PVOID SystemArgument2, KPRIORITY Increment);  
+NTSTATUS	InjectionCodeToProcess(IN PEPROCESS Process);
+
 
 typedef struct _CallbackInfoList{
 	LIST_ENTRY			ListEntry;
@@ -32,7 +45,6 @@ typedef struct _CallbackInfoList{
 }CALLBACKINFO_LIST, *PCALLBACKINFO_LIST;
 
 BOOL 			ProcMonitOn=FALSE;
-// PKMUTEX			nameMutex=NULL;
 PDEVICE_OBJECT	g_pDeviceObject;
 int 			NamePos=0;
 
@@ -191,18 +203,6 @@ NTSTATUS DispatchIoctl(PDEVICE_OBJECT pDevObj, PIRP pIrp)
 			uOutSize = nCpSize;
 			KdPrint(("get info count(%d) size: %d:%d\n", uOutSize / sizeof(CALLBACK_INFO), uOutSize, sizeof(CALLBACK_INFO)));
 			status = STATUS_SUCCESS;
-// 			if(uOutSize >= sizeof(CALLBACK_INFO))
-// 			{
-// 				KeWaitForSingleObject(nameMutex,Executive,KernelMode,FALSE,NULL);
-// 				pCallbackInfo->hParentId  = (ULONGLONG)pDevExt->hPParentId;
-//                 pCallbackInfo->hProcessId = (ULONGLONG)pDevExt->hPProcessId;
-//                 pCallbackInfo->bCreate    = pDevExt->bPCreate;                          
-// 				
-// 				strcpy(pCallbackInfo->proname,pDevExt->proname);
-// 				KeReleaseMutex(nameMutex,FALSE);
-// 
-//                 status = STATUS_SUCCESS;
-// 			}
 			break;
 		}
 	case IOCTL_SET_EVENT:
@@ -257,13 +257,6 @@ VOID ProcessCallback(IN HANDLE  hParentId, IN HANDLE  hProcessId, IN BOOLEAN bCr
 	NTSTATUS		status;
 
 	PsLookupProcessByProcessId(hProcessId, &Epro);
-/*	char* proname=(char*)Epro+NamePos;
-	if(stricmp(proname,"Ehome.exe")==0&&!bCreate)
-	{
-
-		ProcMonitOn=FALSE;
-		return;
-	}*/
 	if(ProcMonitOn)
 	{
 		PDEVICE_EXTENSION		pDevExt			=  (PDEVICE_EXTENSION)g_pDeviceObject->DeviceExtension;
@@ -284,7 +277,10 @@ VOID ProcessCallback(IN HANDLE  hParentId, IN HANDLE  hProcessId, IN BOOLEAN bCr
 			KeDetachProcess();
 			// InjectionCodetoProcess(hProcessId, Epro);
 			if(bCreate)
-				MySuspendProcess(Epro);
+			{
+				InjectionCodeToProcess(Epro);
+				// MySuspendProcess(Epro);
+			}
 			if(0 == status)
 			{
 				wcsncpy(pcbInfo->cbInfo.szImagePath, szImageName, 260);
@@ -542,4 +538,46 @@ NTSTATUS	MySuspendProcess(IN PEPROCESS Process)
 	}
 
 	return STATUS_SUCCESS;
+}
+// 注入的APC
+void InjectionThreadRoutine(IN PKAPC Apc, IN OUT PKNORMAL_ROUTINE *NormalRoutine
+							, IN OUT PVOID *NormalContext, IN OUT PVOID *SystemArgument1
+							, IN OUT PVOID SystemArgument2)
+{
+	LARGE_INTEGER			my_interval		= {0};  
+	// 释放空间
+	ExFreePool(Apc);
+	// 延迟10秒执行
+	my_interval.QuadPart = -10 * 10000 * 1000;     
+	KeDelayExecutionThread(KernelMode, FALSE, &my_interval);
+}
+// 注入进程代码
+NTSTATUS InjectionCodeToProcess(IN PEPROCESS Process)
+{
+	PLIST_ENTRY			pThreadList		= NULL;
+	PETHREAD			pEThread		= NULL;
+	PKTHREAD			pTcb			= NULL;
+	PKAPC				pInjApc			= NULL;
+	NTSTATUS			status			= STATUS_ACCESS_DENIED;
+
+	// 获取相关变量
+	if(FALSE == EPROCESS__ThreadListHead(Process, &pThreadList))
+		return STATUS_ACCESS_DENIED;
+	if(FALSE == CONTAINING_RECORD__ETHREAD(pThreadList->Flink, &pEThread))
+		return STATUS_ACCESS_DENIED;
+	if(FALSE == ETHREAD__Tcb(pEThread, &pTcb))
+		return STATUS_ACCESS_DENIED;
+	// 插下APC
+	pInjApc = (PKAPC)ExAllocatePoolWithTag(NonPagedPool, sizeof(KAPC), 'mohe');
+	if(NULL == pInjApc)
+		return STATUS_MEMORY_NOT_ALLOCATED;
+	KeInitializeApc(pInjApc, pTcb, OriginalApcEnvironment, InjectionThreadRoutine
+		, NULL, NULL, KernelMode, NULL);
+	status = KeInsertQueueApc(pInjApc, pInjApc, NULL, IO_MAILSLOT_INCREMENT);
+	if(!NT_SUCCESS(status))
+	{
+		ExFreePool(pInjApc);
+		KdPrint(("KeInsertQueueApc failed: %d\n", status));
+	}
+	return STATUS_ACCESS_DENIED;
 }
