@@ -5,7 +5,6 @@
 
 PFLT_FILTER		gProcDirFilter			= NULL;
 KSPIN_LOCK		gLockSkipProcess;
-PEPROCESS		gSkipProcess[5]			= {0};
 WCHAR			gProcDir[512]			= {0};
 
 const FLT_CONTEXT_REGISTRATION ContextRegistration[] = {
@@ -52,7 +51,6 @@ const FLT_REGISTRATION FilterRegistration = {
 };
 //////////////////////////////////////////////////////////////////////////
 // 入口函数
-#pragma INITCODE
 NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath)
 {
 	NTSTATUS					status				= STATUS_SUCCESS;
@@ -61,32 +59,32 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObject, PUNICODE_STRING pRegistryPath
 	UNICODE_STRING				usLink				= RTL_CONSTANT_STRING(L"\\??\\C:");
 	UNICODE_STRING				usProcDir;
 
-	DbgPrint("Enter DriverEntry\r\n");
 	pDriverObject->DriverUnload = DDKMinFilemonUnload;
-	// 开启文件过滤
-	status = FltRegisterFilter( pDriverObject,
-		&FilterRegistration,
-		&gProcDirFilter );
-	if( !NT_SUCCESS(status) )
-	{
-		KdPrint(("!!! FltRegisterFilter failed: 0x%X", status));
-		return status;
-	}
-	status = FltStartFiltering(gProcDirFilter);
-	if( !NT_SUCCESS(status) )
-	{
-		KdPrint(("!!! FltStartFiltering failed: 0x%X", status));
-		return status;
-	}
-	KeInitializeSpinLock(&gLockSkipProcess);
 	// 设置过滤目录
 	usProcDir.Buffer = gProcDir;
 	usProcDir.Length = 0;
 	usProcDir.MaximumLength = sizeof(gProcDir);
 	QuerySymbolicLink(&usLink, &usProcDir);
 	// 由于时间的原因， 暂时在这里设置一个固定值
-	wcscat(gProcDir, L"\\xxj");
-	
+	wcscat(gProcDir, L"\\xxj\\");
+	KdPrint(("[MinFilemon.sys] proc dir: %S\n", gProcDir));
+	// 开启文件过滤
+	status = FltRegisterFilter( pDriverObject,
+		&FilterRegistration,
+		&gProcDirFilter );
+	if( !NT_SUCCESS(status) )
+	{
+		KdPrint(("!!! FltRegisterFilter failed: 0x%X\n", status));
+		return status;
+	}
+	status = FltStartFiltering(gProcDirFilter);
+	if( !NT_SUCCESS(status) )
+	{
+		KdPrint(("!!! FltStartFiltering failed: 0x%X\n", status));
+		return status;
+	}
+	KeInitializeSpinLock(&gLockSkipProcess);
+
 	return status;
 }
 
@@ -97,6 +95,7 @@ VOID DDKMinFilemonUnload (__in PDRIVER_OBJECT DriverObject)
 	{
 		FltUnregisterFilter(gProcDirFilter);
 		gProcDirFilter = NULL;
+		KdPrint(("[MinFilemon.sys] stop proc dir: %S", gProcDir));
 	}
 }
 
@@ -149,9 +148,9 @@ FLT_PREOP_CALLBACK_STATUS ScannerPreCreate (__inout PFLT_CALLBACK_DATA Data
 
 	FltParseFileNameInformation( nameInfo );
 	if( 1 == CheckPathIsProc(&nameInfo->Name
-		, FlagOn(FILE_DIRECTORY_FILE, Data->Iopb->Parameters.Create.Options)) )
+			, FlagOn(FILE_DIRECTORY_FILE, Data->Iopb->Parameters.Create.Options)) )
 	{
-		KdPrint(("!!! EHomeSec.sys [ScannerPreCreate] monitoer:%wZ(%d) \n"
+		KdPrint(("!!! MinFileMon.sys [ScannerPreCreate] monitoer:%wZ(%d) \n"
 			, &nameInfo->Name, Data->Iopb->Parameters.Create.Options));
 		FltReleaseFileNameInformation( nameInfo );
 		if((Data->Iopb->Parameters.Create.Options >> 24) != FILE_OPEN)
@@ -180,11 +179,11 @@ FLT_PREOP_CALLBACK_STATUS ScannerPreSetInformation(__inout PFLT_CALLBACK_DATA Da
 	UNREFERENCED_PARAMETER( FltObjects );
 	UNREFERENCED_PARAMETER( CompletionContext );
 
-	if ( FALSE != CheckIsSkip(IoThreadToProcess( Data->Thread )) ) 
-	{
-		KdPrint(( "!!! EHomeSec.sys -- allowing create for trusted process \n" ));
-		return FLT_PREOP_SUCCESS_NO_CALLBACK;
-	}
+// 	if ( FALSE != CheckIsSkip(IoThreadToProcess( Data->Thread )) ) 
+// 	{
+// 		KdPrint(( "!!! MinFileMon.sys -- allowing create for trusted process \n" ));
+// 		return FLT_PREOP_SUCCESS_NO_CALLBACK;
+// 	}
 
 	if (!NT_SUCCESS( Data->IoStatus.Status ) ||	(STATUS_REPARSE == Data->IoStatus.Status)) 
 	{
@@ -205,7 +204,7 @@ FLT_PREOP_CALLBACK_STATUS ScannerPreSetInformation(__inout PFLT_CALLBACK_DATA Da
 	lCheck = CheckPathIsProc(&nameInfo->Name, FALSE);
 	if(0 != lCheck)
 	{
-		KdPrint(("!!! EHomeSec.sys [ScannerPreSetInformation] %wZ(%d).\n"
+		KdPrint(("!!! MinFileMon.sys [ScannerPreSetInformation] %wZ(%d).\n"
 			, &nameInfo->Name, Data->Iopb->Parameters.DirectoryControl.QueryDirectory.FileInformationClass));
 	}
 	FltReleaseFileNameInformation( nameInfo );
@@ -213,12 +212,11 @@ FLT_PREOP_CALLBACK_STATUS ScannerPreSetInformation(__inout PFLT_CALLBACK_DATA Da
 	{
 		//vista或win7返回的FileInformationClass结构不再是FileBothDirectoryInformation.
 		//而是FileidBothDirectoryInformation
-		// 暂时不使用， 改用SHELL模式
-		// 		if(FileBothDirectoryInformation == Data->Iopb->Parameters.DirectoryControl.QueryDirectory.FileInformationClass
-		// 			|| FileIdBothDirectoryInformation == Data->Iopb->Parameters.DirectoryControl.QueryDirectory.FileInformationClass)
-		// 		{
-		// 			return FLT_PREOP_SUCCESS_WITH_CALLBACK;
-		// 		}
+		if(FileBothDirectoryInformation == Data->Iopb->Parameters.DirectoryControl.QueryDirectory.FileInformationClass
+				|| FileIdBothDirectoryInformation == Data->Iopb->Parameters.DirectoryControl.QueryDirectory.FileInformationClass)
+		{
+			return FLT_PREOP_SUCCESS_WITH_CALLBACK;
+		}
 	}
 	else if(0 == lCheck)
 	{
@@ -341,7 +339,7 @@ LONG		CheckPathIsProc(UNICODE_STRING* pusPath, LONG bIsDir)
 	if(0 == gProcDir[0] || NULL == pusPath 
 		|| 0 == nLenPath || NULL == pusPath->Buffer)
 	{
-		KdPrint(("!!! EHomeSec.sys [CheckPathIsProc] can't chekc.\n"));
+		KdPrint(("!!! MinFileMon.sys [CheckPathIsProc] can't chekc.\n"));
 		return 0;
 	}
 
@@ -382,51 +380,6 @@ LONG		CheckPathIsProc(UNICODE_STRING* pusPath, LONG bIsDir)
 		return 1;
 	}
 	return 0;
-}
-
-BOOLEAN		CheckIsSkip(PEPROCESS process)
-{
-	int		i;
-
-	for(i = 0; i < arrayof(gSkipProcess); i++)
-	{
-		if(process == gSkipProcess[i])
-			return TRUE;
-	}
-	return FALSE;
-}
-
-void AddToSkipProcess(PEPROCESS process, BOOLEAN bAdd)
-{
-	KIRQL		oldirql;
-	int			i			= 0;
-
-	KeAcquireSpinLock(&gLockSkipProcess, &oldirql);
-	if(bAdd)
-	{
-		for(i = 0; i < arrayof(gSkipProcess); i++)
-		{
-			if(process == gSkipProcess[i])
-				break;
-			if(NULL == gSkipProcess[i])
-			{
-				gSkipProcess[i] = process;
-				break;
-			}
-		}
-	}
-	else
-	{
-		for(i = 0; i < arrayof(gSkipProcess); i++)
-		{
-			if(process == gSkipProcess[i])
-			{
-				gSkipProcess[i] = NULL;
-				break;
-			}
-		}
-	}
-	KeReleaseSpinLock(&gLockSkipProcess, oldirql);
 }
 
 BOOLEAN GetHideDirectory(WCHAR* pDir, int nLen)
@@ -475,7 +428,7 @@ FLT_POSTOP_CALLBACK_STATUS ScannerPostSetInformation(__inout PFLT_CALLBACK_DATA 
 	UNREFERENCED_PARAMETER( FltObjects );
 	UNREFERENCED_PARAMETER( CompletionContext );
 
-	KdPrint(("!!! EHomeSec.sys [ScannerPostSetInformation] %wZ.\n", FltObjects->FileObject->FileName));
+	KdPrint(("!!! MinFileMon.sys [ScannerPostSetInformation] %wZ.\n", FltObjects->FileObject->FileName));
 
 	if( FlagOn( Flags, FLTFL_POST_OPERATION_DRAINING ) 
 		|| FALSE == GetHideDirectory(szHideDir, arrayof(szHideDir)))
@@ -523,7 +476,7 @@ FLT_POSTOP_CALLBACK_STATUS ScannerPostSetInformation(__inout PFLT_CALLBACK_DATA 
 			xp_nextFileInfo = (PFILE_BOTH_DIR_INFORMATION)((PCHAR)(xp_currentFileInfo) + nextOffset);
 			memset(szFileName, 0, sizeof(szFileName));
 			memcpy(szFileName, xp_currentFileInfo->FileName, min(sizeof(szFileName)-2, xp_currentFileInfo->FileNameLength));
-			KdPrint(("!!! EHomeSec.sys enum dir: %S, %S\n", szFileName, szHideDir));
+			KdPrint(("!!! MinFileMon.sys enum dir: %S, %S\n", szFileName, szHideDir));
 			if(_wcsicmp(szFileName, szHideDir)==0)
 			{                
 				if( nextOffset == 0 )
@@ -549,7 +502,7 @@ FLT_POSTOP_CALLBACK_STATUS ScannerPostSetInformation(__inout PFLT_CALLBACK_DATA 
 			vista_nextFileInfo = (PFILE_ID_BOTH_DIR_INFORMATION)((PCHAR)(vista_currentFileInfo) + nextOffset);
 			memset(szFileName, 0, sizeof(szFileName));
 			memcpy(szFileName, vista_previousFileInfo->FileName, min(sizeof(szFileName)-2, vista_previousFileInfo->FileNameLength));
-			KdPrint(("!!! EHomeSec.sys enum dir: %S, %S\n", szFileName, szHideDir));
+			KdPrint(("!!! MinFileMon.sys enum dir: %S, %S\n", szFileName, szHideDir));
 			if(_wcsicmp(szFileName, szHideDir)==0)
 			{                
 				if( nextOffset == 0 )
