@@ -59,9 +59,7 @@ FLT_POSTOP_CALLBACK_STATUS ScannerPostSetInformation (__inout PFLT_CALLBACK_DATA
 													  , __in_opt PVOID CompletionContext
 													  , __in FLT_POST_OPERATION_FLAGS Flags);
 // 检测目录是否我们的目录
-LONG		CheckPathIsProc(UNICODE_STRING* pusPath, LONG bDir); // 返回 0 表示与监控目录无关, 1 表是监控目录, -1 表示监控目录的子目录
-BOOLEAN		CheckIsSkip(PEPROCESS process);
-VOID		AddToSkipProcess(PEPROCESS process, BOOLEAN bAdd);
+LONG		CheckPathIsProc(UNICODE_STRING* pusPath, LONG bDir); // 返回 0 表示与监控目录无关, 1 表是监控目录, -1 表示监控目录的
 
 typedef struct _SCANNER_STREAM_HANDLE_CONTEXT {
 
