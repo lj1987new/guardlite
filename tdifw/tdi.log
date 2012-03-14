@@ -1,0 +1,307 @@
+很老的东西...一般驱动里通信就是用TDI拉//
+
+/***************************************************************************/
+/*创建上下文句柄....RtlCopyMemory(Ea->EaName, TdiConnectionContext, Ea->EaNameLength + 1); 
+/*CHAR Buffer[sizeof (FILE_FULL_EA_INFORMATION) + TDI_CONNECTION_CONTEXT_LENGTH]; 
+/*这个函数是创建连接终端...(connection endpoint )
+/*A kernel-mode client must open both a connection endpoint and an address with successful calls to 
+/*ZwCreateFile before it calls TdiBuildAssociateAddress
+/***************************************************************************/
+NTSTATUS CreateConnection(PHANDLE Handle, PFILE_OBJECT *FileObject) 
+{ 
+IO_STATUS_BLOCK IoStatus; 
+    NTSTATUS Status;
+    UNICODE_STRING Name; 
+    OBJECT_ATTRIBUTES Attr;
+char Buffer[sizeof(FILE_FULL_EA_INFORMATION) + TDI_CONNECTION_CONTEXT_LENGTH + 300] = {0};
+PFILE_FULL_EA_INFORMATION Ea ;
+
+// DbgPrint("hi in createconnection\n");
+RtlInitUnicodeString(&Name, L"\\Device\\Tcp"); 
+InitializeObjectAttributes(&Attr, &Name, OBJ_CASE_INSENSITIVE, 0, 0); 
+
+Ea = (PFILE_FULL_EA_INFORMATION)&Buffer;
+RtlCopyMemory(Ea->EaName, TdiConnectionContext, TDI_CONNECTION_CONTEXT_LENGTH);
+Ea->EaNameLength = TDI_CONNECTION_CONTEXT_LENGTH; 
+    Ea->EaValueLength =TDI_CONNECTION_CONTEXT_LENGTH; 
+     
+
+Status= ZwCreateFile(Handle, 
+                   GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE, 
+       &Attr, 
+       &IoStatus, 
+       0, 
+       FILE_ATTRIBUTE_NORMAL, 
+       FILE_SHARE_READ, 
+       FILE_OPEN, 
+       0, 
+       Ea, 
+       sizeof(Buffer)); 
+if (!NT_SUCCESS(Status)) 
+{
+   DbgPrint("ZwCreateFile return failed!!\n");
+   return Status; 
+}
+
+return ObReferenceObjectByHandle(*Handle, GENERIC_READ | GENERIC_WRITE, 0, KernelMode, (PVOID *)FileObject, 0);
+
+}
+
+/************************************************************************/
+/* 创建传输句柄...
+/* CHAR Buffer[sizeof (FILE_FULL_EA_INFORMATION) + TDI_TRANSPORT_ADDRESS_LENGTH + sizeof (TA_IP_ADDRESS)];
+/* RtlCopyMemory(Ea->EaName, TdiTransportAddress, Ea->EaNameLength + 1); 
+/*一般是0.0.0.0                                                                 *
+/************************************************************************/
+NTSTATUS CreateAddress(PHANDLE Handle, PFILE_OBJECT *FileObject) 
+{ 
+    UNICODE_STRING Name;
+OBJECT_ATTRIBUTES Attr;
+CHAR Buffer[sizeof (FILE_FULL_EA_INFORMATION) + TDI_TRANSPORT_ADDRESS_LENGTH + sizeof (TA_IP_ADDRESS)];
+PFILE_FULL_EA_INFORMATION Ea;
+IO_STATUS_BLOCK IoStatus;
+NTSTATUS Status ;
+PTA_IP_ADDRESS Sin;
+// DbgPrint(" hi in cretaaddress\n");
+RtlInitUnicodeString(&Name, L"\\Device\\Tcp"); 
+InitializeObjectAttributes(&Attr, &Name, OBJ_CASE_INSENSITIVE, 0, 0); 
+
+Ea = (PFILE_FULL_EA_INFORMATION)Buffer; 
+Ea->NextEntryOffset = 0; 
+    Ea->Flags = 0; 
+    Ea->EaNameLength = TDI_TRANSPORT_ADDRESS_LENGTH; 
+    Ea->EaValueLength = sizeof (TA_IP_ADDRESS); 
+    RtlCopyMemory(Ea->EaName, TdiTransportAddress, Ea->EaNameLength + 1); 
+
+Sin = (PTA_IP_ADDRESS)(Ea->EaName + Ea->EaNameLength + 1); 
+    Sin->TAAddressCount = 1; 
+    Sin->Address[0].AddressLength = TDI_ADDRESS_LENGTH_IP; 
+    Sin->Address[0].AddressType = TDI_ADDRESS_TYPE_IP; 
+    Sin->Address[0].Address[0].sin_port = 0; 
+    Sin->Address[0].Address[0].in_addr = 0; 
+    RtlZeroMemory(Sin->Address[0].Address[0].sin_zero, sizeof(Sin->Address[0].Address[0].sin_zero)); 
+
+Status = ZwCreateFile(Handle, 
+                    0, 
+        &Attr, 
+        &IoStatus, 
+        0, 
+        FILE_ATTRIBUTE_NORMAL, 
+        0, 
+        FILE_OPEN, 
+        0, 
+        Ea, 
+        sizeof(Buffer)); 
+if (!NT_SUCCESS(Status))
+{
+   DbgPrint("CreateAddress->ZwCreateFile return failed!!\n");
+   return Status; 
+}
+
+return ObReferenceObjectByHandle(*Handle, GENERIC_READ | GENERIC_WRITE, 0, KernelMode, (PVOID *)FileObject, 0);
+
+}
+
+/*************************************************************************************************
+/*The client must make the associate-address request before it makes a connection to the remote node 
+/*把FileObject,Address关联...
+/* Associate endpoint with address
+/*************************************************************************************************/
+NTSTATUS Bind(PFILE_OBJECT FileObject, HANDLE Address) 
+{ 
+    KEVENT Event; 
+PDEVICE_OBJECT DeviceObject;
+    IO_STATUS_BLOCK IoStatus;
+PIRP Irp ;
+NTSTATUS Status;
+// Define a completion event
+
+KeInitializeEvent(&Event, NotificationEvent, FALSE); 
+DeviceObject = IoGetRelatedDeviceObject(FileObject); 
+Irp = TdiBuildInternalDeviceControlIrp(TDI_ASSOCIATE_ADDRESS, DeviceObject, FileObject, &Event, &IoStatus); 
+/*
+TdiBuildAssociateAddress sets IRP_MJ_INTERNAL_DEVICE_CONTROL as the MajorFunction and TDI_ASSOCIATE_ADDRESS 
+as the MinorFunction codes in the transport's I/O stack location of the given IRP.*/
+if (Irp == 0) 
+   return STATUS_INSUFFICIENT_RESOURCES; 
+TdiBuildAssociateAddress(Irp, DeviceObject, FileObject, 0, 0, Address); 
+Status = IoCallDriver(DeviceObject, Irp); 
+if (Status == STATUS_PENDING) 
+   Status = KeWaitForSingleObject(&Event, UserRequest, KernelMode, FALSE, 0); 
+return Status == STATUS_SUCCESS ? IoStatus.Status : Status; 
+}
+
+/*********************************************************************************/
+/*创建连接
+/*Connect to the remote controller
+/*
+/*********************************************************************************/
+
+NTSTATUS Connect(PFILE_OBJECT FileObject, ULONG Addr, USHORT Port) 
+{ 
+    KEVENT Event; 
+PDEVICE_OBJECT DeviceObject;
+IO_STATUS_BLOCK IoStatus; 
+PIRP Irp;
+TA_IP_ADDRESS RemoteAddr;
+TDI_CONNECTION_INFORMATION RequestInfo;
+PTDI_ADDRESS_IP pTdiAddressIp;
+NTSTATUS Status;
+
+
+KeInitializeEvent(&Event, NotificationEvent, FALSE); 
+DeviceObject = IoGetRelatedDeviceObject(FileObject); 
+//// build connection packet
+Irp = TdiBuildInternalDeviceControlIrp(TDI_CONNECT, DeviceObject, FileObject, &Event, &IoStatus); 
+if (Irp == 0)
+   return STATUS_INSUFFICIENT_RESOURCES; 
+
+// Initialize controller data
+RemoteAddr.TAAddressCount=1;
+RemoteAddr.Address[0].AddressLength=TDI_ADDRESS_LENGTH_IP;
+RemoteAddr.Address[0].AddressType=TDI_ADDRESS_TYPE_IP;
+/* pTdiAddressIp = (TDI_ADDRESS_IP *)RemoteAddr.Address[0].Address;
+pTdiAddressIp->sin_port=Port;
+pTdiAddressIp->in_addr=Addr;*/
+RemoteAddr.Address[0].Address[0].sin_port =Port;
+    RemoteAddr.Address[0].Address[0].in_addr =Addr;
+
+RequestInfo.Options=0;
+RequestInfo.OptionsLength=0;
+RequestInfo.UserData=0;
+RequestInfo.UserDataLength=0;
+RequestInfo.RemoteAddress=&RemoteAddr;
+RequestInfo.RemoteAddressLength=sizeof(RemoteAddr);
+
+TdiBuildConnect(Irp, DeviceObject, FileObject, 0, 0, 0, &RequestInfo, 0); 
+Status = IoCallDriver(DeviceObject, Irp); 
+if (Status == STATUS_PENDING) 
+   Status = KeWaitForSingleObject(&Event, UserRequest, KernelMode, FALSE, 0); 
+
+return Status == STATUS_SUCCESS ? IoStatus.Status : Status;
+
+}
+
+
+NTSTATUS Disconnect(PFILE_OBJECT FileObject) 
+{ 
+    KEVENT Event;
+NTSTATUS Status;
+PDEVICE_OBJECT DeviceObject;
+IO_STATUS_BLOCK IoStatus; 
+PIRP Irp;
+
+KeInitializeEvent(&Event, NotificationEvent, FALSE); 
+DeviceObject = IoGetRelatedDeviceObject(FileObject); 
+Irp = TdiBuildInternalDeviceControlIrp(TDI_DISCONNECT, DeviceObject, FileObject, &Event, &IoStatus); 
+if (Irp == 0)
+   return STATUS_INSUFFICIENT_RESOURCES; 
+TdiBuildDisconnect(Irp, DeviceObject, FileObject, 0, 0, 0, TDI_DISCONNECT_RELEASE, 0, 0); 
+Status = IoCallDriver(DeviceObject, Irp); 
+if (Status == STATUS_PENDING) 
+   Status = KeWaitForSingleObject(&Event, UserRequest, KernelMode, FALSE, 0); 
+
+return Status == STATUS_SUCCESS ? IoStatus.Status : Status; 
+}
+
+
+NTSTATUS Send(PFILE_OBJECT FileObject, PVOID Data, ULONG Length) 
+{ 
+    KEVENT Event; 
+PDEVICE_OBJECT DeviceObject ;
+IO_STATUS_BLOCK IoStatus; 
+PIRP Irp;
+PMDL Mdl;
+NTSTATUS Status;
+
+KeInitializeEvent(&Event, NotificationEvent, FALSE); 
+//The TDI Device Object is required to send these requests to the TDI Driver.
+
+DeviceObject = IoGetRelatedDeviceObject(FileObject); 
+Irp = TdiBuildInternalDeviceControlIrp(TDI_SEND, DeviceObject, FileObject, &Event, &IoStatus); 
+if (Irp == 0) 
+   return STATUS_INSUFFICIENT_RESOURCES; 
+
+Mdl = IoAllocateMdl(Data, Length, FALSE, FALSE, Irp); 
+if (Mdl == 0)
+   return STATUS_INSUFFICIENT_RESOURCES; 
+__try 
+{ 
+   MmProbeAndLockPages(Mdl, KernelMode, IoModifyAccess);
+}__except (EXCEPTION_EXECUTE_HANDLER) 
+{ 
+   IoFreeMdl(Mdl); 
+   Mdl = NULL;
+}
+
+
+TdiBuildSend(Irp, DeviceObject, FileObject, 0, 0, Mdl, 0, Length); 
+Status = IoCallDriver(DeviceObject, Irp); 
+/* If the status returned is STATUS_PENDING this means that the IRP will not be completed synchronously 
+and the driver has queued the IRP for later processing. This is fine but we do not want to return this 
+not want to return this not want to return this to wait until it has completed. The EVENT that we 
+providedwill be set when the IRP completes. */ 
+if (Status == STATUS_PENDING) 
+   Status = KeWaitForSingleObject(&Event, UserRequest, KernelMode, FALSE, 0); 
+
+return Status == STATUS_SUCCESS ? IoStatus.Status : Status; 
+}
+
+NTSTATUS SendDataToRemote(PVOID Data,ULONG RemoteAddress,ULONG RemotePort) 
+{ 
+    PFILE_OBJECT ConnectionFileObject, AddressFileObject; 
+    HANDLE AddressHandle, ConnectionHandle; 
+    NTSTATUS Status; 
+IO_STATUS_BLOCK IoStatus;
+KEVENT Event;
+
+//CreateAddress,创建传输地址,该地址是指本机地址
+Status = CreateAddress(&AddressHandle, &AddressFileObject); 
+    if (!NT_SUCCESS(Status)) 
+{   
+   DbgPrint("createaddress return failed!!\n");
+   return Status; 
+}
+DbgPrint(" createaddress return OK!\n");
+
+//CreateConnection-->>创建一个连接终端
+Status = CreateConnection(&ConnectionHandle, &ConnectionFileObject); 
+    if (!NT_SUCCESS(Status)) 
+{
+   DbgPrint("createconnection return failed!!\n");
+   return Status; 
+}
+
+
+   Status = Bind(ConnectionFileObject, AddressHandle); 
+        if (!NT_SUCCESS(Status)) 
+   {
+    DbgPrint("Bind() return failed!!\n");
+    return Status;
+   }
+  
+   Status = Connect(ConnectionFileObject, RemoteAddress, RemotePort); 
+        if (!NT_SUCCESS(Status))
+   {
+    DbgPrint("Connect() return failed!!\n");
+    return Status;
+   }
+        Status = Send(ConnectionFileObject, Data, strlen(Data)); 
+        if (!NT_SUCCESS(Status))
+   {
+    DbgPrint("Send() return failed!!\n");
+    return Status;
+   }
+        Status = Disconnect(ConnectionFileObject); 
+        if (!NT_SUCCESS(Status))
+   {
+    DbgPrint("Disconnect() return failed!!\n");
+    return Status;
+   }
+
+ObDereferenceObject(ConnectionFileObject); 
+ObDereferenceObject(AddressFileObject); 
+ZwClose(ConnectionHandle); 
+ZwClose(AddressHandle); 
+return Status; 
+}
