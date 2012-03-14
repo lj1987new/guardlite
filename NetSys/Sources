@@ -4,5 +4,8 @@ TARGETTYPE=DRIVER
 TARGETLIBS=
 C_DEFINES=
 
-SOURCES = EhomeNet.c
+SOURCES = EhomeNet.c \
+		  EHomeNetTDI.c \
+		  TdiSocketContext.c \
+		  Keyword.c \
 
