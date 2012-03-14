@@ -7,11 +7,10 @@
 
 #include "EhomeNet.h"
 #include "EhomeDevCtl.h"
+#include "Keyword.h"
 
 // 进程名索引
 int							NamePos						= 0;
-// 操作互斥的自旋锁
-PKSPIN_LOCK					listSpinlock				= NULL;
 // 进程名在PEPROCESS结构中的索引
 PEPROCESS					gControlPID					= NULL;
 PFILE_OBJECT				hcFileObj					= NULL;
@@ -24,10 +23,11 @@ PKEVENT						EhomeUsrEvent				= NULL;
 PDEVICE_OBJECT				EhomeCtlDev					= NULL;
 PKEVENT						UrlAllowOrNotEvent			= NULL;
 PKMUTEX						UrlNameMutex				= NULL;
-NPAGED_LOOKASIDE_LIST		gPagedLookaside				= {0};
-PNPAGED_LOOKASIDE_LIST		NpagedLookaside				= &gPagedLookaside;
+EHOME_FILTER_RULE			gEHomeFilterRule			= {0};
+// NPAGED_LOOKASIDE_LIST		gPagedLookaside				= {0};
+// PNPAGED_LOOKASIDE_LIST		NpagedLookaside				= &gPagedLookaside;
 // 一个新的TCP请求到来时会存储在EHOME_LIST结构的链表中
-PLIST_ENTRY					pEhomelistHeader			= NULL;
+// PLIST_ENTRY					pEhomelistHeader			= NULL;
 // 新增断网标志
 CTRLNETWORK*				gpCtrlNetWork				= NULL;
 LONG						gRefCount					= 0L;
@@ -46,16 +46,11 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 	PDEVICE_EXTENTION		DevExt;
 	
 	epro = PsGetCurrentProcess();
-	listSpinlock = (PKSPIN_LOCK)ExAllocatePoolWithTag(NonPagedPool, sizeof(KSPIN_LOCK), 'ehom');
-	pEhomelistHeader = (PLIST_ENTRY)ExAllocatePoolWithTag(NonPagedPool, sizeof(LIST_ENTRY), 'ehom');
-// 	NpagedLookaside = (PNPAGED_LOOKASIDE_LIST)ExAllocatePool(NonPagedPool, sizeof(NPAGED_LOOKASIDE_LIST));
 	UrlAllowOrNotEvent = (PKEVENT)ExAllocatePoolWithTag(NonPagedPool, sizeof(KEVENT), 'ehom');
 	UrlNameMutex = (PKMUTEX)ExAllocatePoolWithTag(NonPagedPool, sizeof(KMUTEX), 'ehom');
 	gpCtrlNetWork = (CTRLNETWORK*)ExAllocatePoolWithTag(NonPagedPool, 1024, 'ehom');
 	// 因为EHOME_LIST会频繁的申请和回收，避免产生内存空漏洞而使用LOOKASIDE结构
-	ExInitializeNPagedLookasideList(NpagedLookaside, NULL, NULL, 0, sizeof(EHOME_LIST), 'ehom', 0);
-	InitializeListHead(pEhomelistHeader);
-	if(!UrlAllowOrNotEvent && !UrlNameMutex && !NpagedLookaside && !pEhomelistHeader && !listSpinlock && !gpCtrlNetWork)
+	if(!UrlAllowOrNotEvent && !UrlNameMutex && !gpCtrlNetWork)
 	{
 		status = STATUS_INSUFFICIENT_RESOURCES;
 		goto failed;
@@ -69,7 +64,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 	// 初始化事件、互斥量和自旋锁
 	KeInitializeEvent(UrlAllowOrNotEvent, NotificationEvent, TRUE);
 	KeInitializeMutex(UrlNameMutex, 0);
-	KeInitializeSpinLock(listSpinlock);
 	////KdPrint(("Enter EhomeDrvEntry\n"));
 	// 分配派遣函数
 	for(i=0;i<IRP_MJ_MAXIMUM_FUNCTION;i++)
@@ -119,6 +113,9 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 		//KdPrint(("Create Symbok link failed"));
 		goto failed;
 	}
+	// 初始化
+	TdiSocketContextInit();
+	KeywordInit();
 	// 附加过滤设备到"\\Device\\Tcp"的设备栈
 	LowTcpDevObj = IoAttachDeviceToDeviceStack(EhomefltDev, TcpDevobj);
 	LowUdpDevObj = IoAttachDeviceToDeviceStack(EhomefltUdpDev, UdpDevobj);
@@ -157,6 +154,8 @@ failed:
 	// 失败后清除分配的内存
 	gEhomeClear = 0L;
 	EhomeClear();
+	TdiSocketContextRelease();
+	KeywordDestroy();
 	// 失败后删除创建的设备
 	if(NULL != EhomeCtlDev)
 		IoDeleteDevice(EhomeCtlDev);
@@ -221,21 +220,55 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 	// 普通监控模式
 	if(stack->MinorFunction == TDI_SEND)
 	{
+		PTDI_SOCKET_CONTEXT		pSocketContext		= NULL;
+
 		if(0 == IsHttpFilterOn)
 			goto skipirp;
 		// 发送数据过滤过理
 		reqSend = (TDI_REQUEST_KERNEL_SEND *)&stack->Parameters;
 		// 过滤多端口数据
-		if(IsHttpRequest(stack->FileObject, &pAddress))
+		if(IsTcpRequest(stack->FileObject, &pAddress, &pSocketContext))
 		{
+			BOOLEAN		bIsHttp			= pAddress->bChecked;
+			
+			status = STATUS_SUCCESS;
 			httpPacket = (char*)MmGetSystemAddressForMdlSafe(irp->MdlAddress, NormalPagePriority);
-			// 互斥等待
-			KeWaitForSingleObject(UrlNameMutex, Executive, KernelMode, FALSE, NULL); 
-			// 只过滤GET请求
-			status = CheckUrl(httpPacket, reqSend->SendLength, pAddress);
-			KeReleaseMutex(UrlNameMutex, FALSE);
-			// 清除标记，使其不会再次被获取
-			TdiDisConnect(irp, stack);	
+			if(FALSE == pAddress->bChecked)
+			{
+				// 互斥等待
+				__try{
+					// 有一台机子， 莫名其秒在此出现错误，原因为未查明
+					KeWaitForSingleObject(UrlNameMutex, Executive, KernelMode, FALSE, NULL); 
+				} 
+				__except (EXCEPTION_EXECUTE_HANDLER)
+				{
+					goto skipirp;
+				}
+				// 只过滤GET请求
+				status = CheckUrl(httpPacket, reqSend->SendLength, pAddress, &bIsHttp);
+				KeReleaseMutex(UrlNameMutex, FALSE);
+				// 清除标记，使其不会再次被获取
+				if(FALSE != bIsHttp)
+				{
+					PTDI_SOCKET_CONTEXT		pSockAddress		= TdiSocketContextGetAddress(pSocketContext->pConnectFileObj, FALSE);
+
+					pAddress->bChecked = TRUE;
+					pSockAddress->bIsHttp = TRUE;
+				}
+			}
+			// 替换HTTP的压缩标志
+			if(FALSE != bIsHttp)
+			{
+				__try{
+					// 防止读取越界的情况
+					if(0 != gEHomeFilterRule.rule)
+						HttpRequestEraseFlag(httpPacket, reqSend->SendLength);
+				} 
+				__except (EXCEPTION_EXECUTE_HANDLER)
+				{
+					goto skipirp;
+				}
+			}
 			if(NT_SUCCESS(status))
 				goto skipirp;
 			goto stopirp;	// 停止操作
@@ -243,19 +276,66 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 	}
 	else if(stack->MinorFunction == TDI_CONNECT)
 	{
-		// 当用户连接TCP是
-		/*req = (TDI_REQUEST_KERNEL *)&stack->Parameters;
-		remote_addr = (((TRANSPORT_ADDRESS *)req->RequestConnectionInformation->RemoteAddress))->Address;
-		IPAdd = my_ntohl(((TDI_ADDRESS_IP *)(remote_addr->Address))->in_addr);
-		port = my_ntohs(((TDI_ADDRESS_IP *)(remote_addr->Address))->sin_port);
-		if(80 == port)
-		{ */
 		// 监控所有端口
 		IoCopyCurrentIrpStackLocationToNext(irp);
 		IoSetCompletionRoutine(irp, EhomeConnectComRoutine, NULL, TRUE, TRUE, TRUE);
 		status = IoCallDriver(DevExt->LowTcpDev, irp);
 		return status;
-		/*}*/
+	}
+	else if(TDI_SET_EVENT_HANDLER == stack->MinorFunction)
+	{
+		status = EHomeTDISetEventHandler(irp, stack);
+		if(!NT_SUCCESS(status))
+			goto stopirp;
+	}
+	else if(TDI_RECEIVE == stack->MinorFunction)
+	{
+// 		ULONG									nReceiveLen			= ((PTDI_REQUEST_KERNEL_RECEIVE)&stack->Parameters)->ReceiveLength;
+// 		PVOID									pReceiveData		= MmGetSystemAddressForMdlSafe(irp->MdlAddress, NormalPagePriority);
+// 		PTDI_SOCKET_CONTEXT						pSocketConnect		= TdiSocketContextGetConnect(stack->FileObject, FALSE);
+// 		PTDI_SOCKET_CONTEXT						pSocketContext;
+// 		BOOLEAN									bContinue			= TRUE;
+// 
+// 		KdPrint(("[EhomeInternalDevCtl] TDI_RECEIVE len: %d, data: %s\n", nReceiveLen, pReceiveData));
+// 		if(NULL != pSocketConnect)
+// 			pSocketContext = TdiSocketContextGetAddress(pSocketConnect->pConnectFileObj, FALSE);
+// 		else
+// 			pSocketConnect = TdiSocketContextGetAddress(stack->FileObject, FALSE);
+// 		if(NULL == pReceiveData || NULL == pSocketContext)
+// 			goto skipirp;
+// 		if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
+// 		{
+// 			EHomeFilterRecvData(pReceiveData, nReceiveLen, &bContinue);
+// 			if( FALSE == bContinue )
+// 				goto skipirp;
+// 		}
+		IoCopyCurrentIrpStackLocationToNext(irp);
+		IoSetCompletionRoutine(irp, tdi_client_irp_complete, NULL, TRUE, TRUE, TRUE);
+		status = IoCallDriver(DevExt->LowTcpDev, irp);
+		return status;
+	}
+	else if(TDI_ASSOCIATE_ADDRESS == stack->MinorFunction)
+	{
+		// 关连地址对像和端口对像
+		PFILE_OBJECT			pAddressFileObj		= NULL;
+		PTDI_SOCKET_CONTEXT		pSocketAddress		= NULL;
+		PTDI_SOCKET_CONTEXT		pSocketConnet		= NULL;
+
+		status = ObReferenceObjectByHandle(((PTDI_REQUEST_KERNEL_ASSOCIATE)&stack->Parameters)->AddressHandle
+			, FILE_ANY_ACCESS, 0, KernelMode, (PVOID *)&pAddressFileObj, NULL);
+		KdPrint(("[EhomeInternalDevCtl] TDI_ASSOCIATE_ADDRESS PortObj: %x, AddrObj: %x \n", stack->FileObject, pAddressFileObj));
+		pSocketAddress = TdiSocketContextGetAddress(pAddressFileObj, TRUE);
+		pSocketConnet = TdiSocketContextGetConnect(stack->FileObject, TRUE);
+		// 地址对像
+		if(NULL != pSocketAddress)
+		{
+			pSocketAddress->pConnectFileObj = stack->FileObject;
+		}
+		// 连接对像
+		if(NULL != pSocketConnet)
+		{
+			pSocketConnet->pConnectFileObj = pAddressFileObj;
+		}
 	}
 
 	goto skipirp;
@@ -363,7 +443,7 @@ irpstop:
 	return status;
 }
 // 检测网址
-NTSTATUS CheckUrl(char* pHttpPacket, int nHttpLen, PASSOCIATE_ADDRESS pAddress)
+NTSTATUS CheckUrl(char* pHttpPacket, int nHttpLen, PASSOCIATE_ADDRESS pAddress, BOOLEAN* pIsHttp)
 {
 	int					nFindLabel		= 0;
 	char*				pNextLine		= pHttpPacket;
@@ -372,9 +452,18 @@ NTSTATUS CheckUrl(char* pHttpPacket, int nHttpLen, PASSOCIATE_ADDRESS pAddress)
 	LARGE_INTEGER		timeout;
 	int					i				= 0;
 
+// 	KdPrint(("[CheckUrl] find connect: %s\n", pHttpPacket));
+	*pIsHttp = FALSE;
 	if(_strnicmp(pHttpPacket, "GET", 3) != 0)
+	{
+		if(_strnicmp(pHttpPacket, "POST", 4) == 0
+			|| _strnicmp(pHttpPacket, "CONNECT", 7) == 0)
+		{
+			*pIsHttp = TRUE;
+		}
 		return STATUS_SUCCESS;
-
+	}
+	*pIsHttp = TRUE;
 	HostInfo.bHasInline = 0;
 	RtlZeroMemory(HostInfo.szUrl, sizeof(HostInfo.szUrl));
 	RtlZeroMemory(HostInfo.szUrlPath, sizeof(HostInfo.szUrlPath));
@@ -420,7 +509,7 @@ NTSTATUS CheckUrl(char* pHttpPacket, int nHttpLen, PASSOCIATE_ADDRESS pAddress)
 			pCRLF++;
 		pNextLine = pCRLF;
 	}
-
+// 	KdPrint(("[CheckUrl] real connect: %s\n", pHttpPacket));
 	if(0 == HostInfo.szUrl[0])
 		return STATUS_SUCCESS;	// 没有找到网址
 
@@ -610,6 +699,27 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 			uOutSize = 0;
 			break;
 		}
+	case IOCTL_CONTROL_FILTER_RULE:
+		{
+			if(uInSize >= 4)
+			{
+				gEHomeFilterRule.rule = *((int *)buf);
+			}
+		}
+		break;
+	case IOCTL_CONTROL_FILTER_ADDKEYWORD:
+		{
+			if(uInSize > 0)
+			{
+				KeywordAdd((char *)buf, uInSize);
+			}
+		}
+		break;
+	case IOCTL_CONTROL_FILTER_CLEARKEYWORD:
+		{
+			KeywordClear();
+		}
+		break;
 	}
 
 	if(status == STATUS_SUCCESS)
@@ -633,9 +743,9 @@ NTSTATUS EhomeCloseCleanup(PDEVICE_OBJECT pDevObj,PIRP irp)
 	stack = IoGetCurrentIrpStackLocation(irp);
 	if(pDevObj != EhomeCtlDev)
 	{
+		PTDI_SOCKET_CONTEXT		pSockConnet		= TdiSocketContextGetConnect(stack->FileObject, TRUE);
 		// 过滤设备直接跳过
-//		//KdPrint(("FltDev close  fileObj is:%x\n",stack->FileObject));
-		TdiDisConnect(irp, stack);
+		TdiSocketContextErase(stack->FileObject);
 #ifdef NO_UNLOAD
 		IoSkipCurrentIrpStackLocation(irp);
 #else
@@ -678,8 +788,8 @@ NTSTATUS EhomeConnectComRoutine(
     )
 {
 	KIRQL					oldIrql;
-	PEHOME_LIST				Ehomelist;
 	PIO_STACK_LOCATION		stack			= IoGetCurrentIrpStackLocation(irp);
+	PTDI_SOCKET_CONTEXT		pSockConnect	= NULL;
 	TA_ADDRESS *			remote_addr;
 	USHORT					port;
 	ULONG					IPAdd;
@@ -698,65 +808,24 @@ NTSTATUS EhomeConnectComRoutine(
 	//		DbgPrint("CompleteRoutine fileObj is:%x PORT is:%d \n",stack->FileObject,port);
 
 	// 添加到监控链表
-	Ehomelist = (PEHOME_LIST)ExAllocateFromNPagedLookasideList(NpagedLookaside);
-	if(Ehomelist)
+	pSockConnect = TdiSocketContextGetConnect(stack->FileObject, FALSE);
+
+	if(pSockConnect)
 	{
-		Ehomelist->AddFileObj.fileObj = stack->FileObject;
-		Ehomelist->AddFileObj.IPAdd = IPAdd;
-		Ehomelist->AddFileObj.Port = port;
-		KeAcquireSpinLock(listSpinlock, &oldIrql);
-		InsertHeadList(pEhomelistHeader, &Ehomelist->plist);
-		KeReleaseSpinLock(listSpinlock, oldIrql);
+		pSockConnect->address.IPAdd = IPAdd;
+		pSockConnect->address.Port = port;
+		pSockConnect->address.bChecked = FALSE;
+		KdPrint(("[EhomeConnectComRoutine] find conenct: fileobj=%x\n", stack->FileObject));
 	}
 		
 	InterlockedDecrement(&gRefCount);
 	return STATUS_SUCCESS/*STATUS_CONTINUE_COMPLETION*/;
 }
-// 清除TDI操作
-VOID TdiDisConnect(PIRP irp,PIO_STACK_LOCATION stack)
-{
-	KIRQL				oldIrql;
-	PLIST_ENTRY			plist			= pEhomelistHeader->Blink;
-
-	while(plist != pEhomelistHeader)
-	{
-		if(stack->FileObject == ((PEHOME_LIST)plist)->AddFileObj.fileObj)
-		{
-			KeAcquireSpinLock(listSpinlock,&oldIrql);
-			plist->Flink->Blink = plist->Blink;
-			plist->Blink->Flink = plist->Flink;
-			KeReleaseSpinLock(listSpinlock,oldIrql);
-			ExFreeToNPagedLookasideList(NpagedLookaside,(PEHOME_LIST)plist);
-			break;
-		}
-		plist = plist->Blink;
-	}
-}
 BOOL EhomeTDISend(PIRP irp,PIO_STACK_LOCATION stack)
 {
 	return TRUE;
 }
-BOOL IsHttpRequest(PFILE_OBJECT fileObj, PASSOCIATE_ADDRESS* pAddress /*= NULL*/)
-{
-	KIRQL oldIrql;
-	PLIST_ENTRY plist;
-	
-	KeAcquireSpinLock(listSpinlock,&oldIrql);
-	plist=pEhomelistHeader->Blink;
-	while(plist!=pEhomelistHeader)
-	{
-		if(((PEHOME_LIST)plist)->AddFileObj.fileObj==fileObj)
-		{
-			KeReleaseSpinLock(listSpinlock,oldIrql);
-			if(NULL != pAddress)
-				*pAddress = &((PEHOME_LIST)plist)->AddFileObj;
-			return TRUE;
-		}
-		plist=plist->Blink;
-	}
-	KeReleaseSpinLock(listSpinlock,oldIrql);
-	return FALSE;
-}
+
 // 是否跳过的进程
 BOOL IsSkipDisnetwork(char* pProcName)
 {
@@ -838,10 +907,6 @@ void EhomeClear()
 	if(gEhomeClear > 0)
 		return;
 
-	if(NULL != listSpinlock)
-		ExFreePool(listSpinlock);
-	if(NULL != pEhomelistHeader)
-		ExFreePool(pEhomelistHeader);
 	if(NULL != UrlAllowOrNotEvent)
 		ExFreePool(UrlAllowOrNotEvent);
 	if(NULL != UrlNameMutex)
@@ -849,9 +914,65 @@ void EhomeClear()
 	if(NULL != gpCtrlNetWork)
 		ExFreePool(gpCtrlNetWork);
 
-	listSpinlock = NULL;
-	pEhomelistHeader = NULL;
 	UrlAllowOrNotEvent = NULL;
 	UrlNameMutex = NULL;
 	gpCtrlNetWork = NULL;
+}
+
+/* 过滤掉不是HTTP的请求 */
+void		HttpRequestEraseFlag(char* pHttpRequest, int nHttpLen)
+{
+	char*				pNextLine		= pHttpRequest;
+	int					i				= 0;
+	char*				pGzip			= NULL;
+
+	// 分析是否有代理标志
+	while(NULL != pNextLine)
+	{
+		if(_strnicmp(pNextLine, "Accept-Encoding:", 16) == 0)
+		{
+			for(i = (pNextLine - pHttpRequest) + 16
+				; i < nHttpLen && '\x0' != pHttpRequest[i] && '\r' != pHttpRequest[i] && '\n' != pHttpRequest[i]
+				; i++)
+			{
+				pHttpRequest[i] = '\x20';
+			}
+		}
+		else if(_strnicmp(pNextLine, "Cookie:", 7) == 0)
+		{
+			// 谷哥等网站会根据这个值来加密网页 - 特定征对谷哥网站
+			for(i = (pNextLine - pHttpRequest) + 7
+				; i < (nHttpLen - 6) && '\x0' != pHttpRequest[i] && '\r' != pHttpRequest[i] && '\n' != pHttpRequest[i]
+				; i++)
+			{
+				if(_strnicmp(pHttpRequest + i, "GZ=Z=1", 6) == 0)
+				{
+					int			k		= 0;
+
+					for(k; k < 6; k++)
+						pHttpRequest[i + k] = ';';
+					break;
+				}
+			}
+		}
+		// 查找下一行
+		for(i = pNextLine - pHttpRequest; i < (nHttpLen - 1); i++)
+		{
+			if('\r' == pHttpRequest[i])
+			{
+				if('\n' == pHttpRequest[i+1])
+				{
+					pNextLine = pHttpRequest + (i + 2);
+					break;
+				}
+			} 
+			else if('\n' == pHttpRequest[i])
+			{
+				pNextLine = pHttpRequest + (i + 1);
+				break;
+			}
+		}
+		if(i >= (nHttpLen - 1))
+			break; // 找不到下一行
+	}
 }

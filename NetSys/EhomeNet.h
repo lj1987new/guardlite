@@ -1,8 +1,9 @@
-
+#pragma once
 
 #include <ntddk.h>
-#include <tdi.h>
-#include <TdiKrnl.h>
+#include "tdi.h"
+#include "TdiKrnl.h"
+#include "TdiSocketContext.h"
 
 #define NO_UNLOAD
 
@@ -30,19 +31,13 @@ typedef struct _DEVICE_EXTENTION
 	DEVICETYPE				DeviceType;	
 }DEVICE_EXTENTION, *PDEVICE_EXTENTION;
 
-typedef struct _ASSOCIATE_ADDRESS
-{
-	PFILE_OBJECT		fileObj;
-	ULONG				IPAdd;
-	USHORT				Port;
-}ASSOCIATE_ADDRESS, *PASSOCIATE_ADDRESS;
+typedef struct _EHOME_KEYWORK_LIST{
+	LIST_ENTRY			list;
+}EHOME_KEYWORK_LIST, *PEHOME_KEYWORK_LIST;
 
-typedef struct _EHOME_LIST
-{
-	LIST_ENTRY			plist;
-	ASSOCIATE_ADDRESS	AddFileObj;
-}EHOME_LIST, *PEHOME_LIST;
-
+typedef struct _EHOME_FILTER_RULE{
+	int				rule;		/* 0: 停止过滤, >0: 发现关键字替换, <0: 发现关键字断开*/
+}EHOME_FILTER_RULE, *PEHOME_FILTER_RULE;
 
 NTSTATUS	Ehomedisp(PDEVICE_OBJECT pDevObj,PIRP irp);
 NTSTATUS	EhomeCreate(PDEVICE_OBJECT pDevObj,PIRP irp);
@@ -58,15 +53,23 @@ NTSTATUS
     IN PIRP  irp,
     IN PVOID  Context
     );
-VOID TdiDisConnect(PIRP irp,PIO_STACK_LOCATION stack);
+// VOID TdiDisConnect(PIRP irp,PIO_STACK_LOCATION stack);
 BOOL EhomeTDISend(PIRP irp,PIO_STACK_LOCATION stack);
-BOOL IsHttpRequest(PFILE_OBJECT fileObj, PASSOCIATE_ADDRESS* pAddress);
 BOOL IsSkipDisnetwork(char* pProcName);		// 是否跳过的进程
 
+// 设置事件句柄
+NTSTATUS		EHomeTDISetEventHandler(PIRP pIrp, PIO_STACK_LOCATION pStack);
 // 御载功能
 void		EhomeUnload(PDRIVER_OBJECT pDriverObject);
 void		EhomeClear();
 NTSTATUS	DispatchRoutineComplate(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN PVOID Context);
 // 断网功能
 NTSTATUS	CheckNetwork(PIO_STACK_LOCATION pStack, PDEVICE_EXTENTION pDevExt, char* pProcName);	
-NTSTATUS	CheckUrl(char* pHttpPacket, int nHttpLen, PASSOCIATE_ADDRESS pAddress);
+NTSTATUS	CheckUrl(char* pHttpPacket, int nHttpLen, PASSOCIATE_ADDRESS pAddress, BOOLEAN* pIsHttp);
+void		HttpRequestEraseFlag(char* pHttpRequest, int nHttpLen);
+
+// 处理关键字过滤
+void EHomeFilterRecvData(IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue);
+NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN PVOID Context);
+
+extern EHOME_FILTER_RULE	gEHomeFilterRule;

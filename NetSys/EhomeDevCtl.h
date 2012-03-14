@@ -34,6 +34,29 @@
  */
 #define IOCTL_CONTROL_CLEARCACHE	CTL_CODE(FILE_DEVICE_UNKNOWN,\
 		0x0804, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
+/*
+ *	设置关键字过滤规则
+ *  <0, 发现关键字断开网络
+ *  >0, 发现关键字替换为*号
+ *  0, 停止关键字过滤, 默认是关闭的
+ */
+#define IOCTL_CONTROL_FILTER_RULE	CTL_CODE(FILE_DEVICE_UNKNOWN,\
+		0x0805, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
+/*
+ *	添加关键字过滤
+ *  设置要过滤的关键字
+ */
+#define IOCTL_CONTROL_FILTER_ADDKEYWORD	CTL_CODE(FILE_DEVICE_UNKNOWN,\
+		0x0806, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
+/*
+ *	清除规则
+ */
+#define IOCTL_CONTROL_FILTER_CLEARKEYWORD	CTL_CODE(FILE_DEVICE_UNKNOWN,\
+		0x0807, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
 //////////////////////////////////////////////////////////////////////////
 #define NAMELENGTH     128
 #pragma pack(push, 1)
