@@ -16,10 +16,10 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 NTSTATUS		EHomeTDISetEventHandler(PIRP pIrp, PIO_STACK_LOCATION pStack)
 {
 	PTDI_REQUEST_KERNEL_SET_EVENT			pTdiEvent			= NULL;
-	PTDI_SOCKET_CONTEXT						pSocketContext		= NULL;
+	tdi_foc_ptr						pSocketContext		= NULL;
 
 	pTdiEvent = (PTDI_REQUEST_KERNEL_SET_EVENT)&pStack->Parameters;
-	pSocketContext = TdiSocketContextGet(pStack->FileObject, TRUE);
+	pSocketContext = tdi_foc_get(pStack->FileObject, TRUE);
 	if(NULL == pSocketContext)
 		return STATUS_SUCCESS;
 
@@ -54,11 +54,11 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 								 , IN ULONG  ReceiveFlags, IN ULONG  BytesIndicated, IN ULONG  BytesAvailable
 								 , OUT ULONG  *BytesTaken, IN PVOID  Tsdu, OUT PIRP  *IoRequestPacket)
 {
-	PTDI_SOCKET_CONTEXT						pSocketContext		= NULL;
+	tdi_foc_ptr						pSocketContext		= NULL;
 	NTSTATUS								status				= STATUS_SUCCESS;
 	char*									pData				= NULL;
 
-	pSocketContext = TdiSocketContextGet((PFILE_OBJECT)TdiEventContext, FALSE);
+	pSocketContext = tdi_foc_Get((PFILE_OBJECT)TdiEventContext, FALSE);
 	if(NULL == pSocketContext)
 		return STATUS_SUCCESS;
 	if(NULL == pSocketContext->event_receive_handler)
@@ -95,11 +95,11 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 										, IN ULONG  ReceiveFlags, IN ULONG  ReceiveLength, IN ULONG  StartingOffset
 										, IN PMDL  Tsdu, IN PVOID  TsduDescriptor)
 {
-	PTDI_SOCKET_CONTEXT						pSocketContext		= NULL;
+	tdi_foc_ptr						pSocketContext		= NULL;
 	NTSTATUS								status				= STATUS_SUCCESS;
 	char*									pData				= NULL;
 
-	pSocketContext = TdiSocketContextGet((PFILE_OBJECT)TdiEventContext, FALSE);
+	pSocketContext = tdi_foc_Get((PFILE_OBJECT)TdiEventContext, FALSE);
 	if(NULL == pSocketContext)
 		return STATUS_SUCCESS;
 	if(NULL == pSocketContext->event_receive_handler)
@@ -161,7 +161,7 @@ NTSTATUS TdiCall (IN PIRP pIrp, IN PDEVICE_OBJECT pDeviceObject, IN OUT PIO_STAT
 
 NTSTATUS EHomeRecive(PDEVICE_OBJECT pDeviceObject, PFILE_OBJECT pFileObject)
 {
-	PTDI_SOCKET_CONTEXT			pSocket;
+	tdi_foc_ptr			pSocket;
 	char						szData[]		= {"HTTP/1.1 302 Found\r\n"
 		"Location: http://www.google.com.hk/\r\n"
 		"Content-Length: 0\r\n"
@@ -169,7 +169,7 @@ NTSTATUS EHomeRecive(PDEVICE_OBJECT pDeviceObject, PFILE_OBJECT pFileObject)
 	ULONG						len				= sizeof(szData);
 	NTSTATUS					status			= 0;
 
-	pSocket = TdiSocketContextGet(pFileObject, FALSE);
+	pSocket = tdi_foc_Get(pFileObject, FALSE);
 	if(NULL == pSocket)
 		return STATUS_INSUFFICIENT_RESOURCES;
 	if(NULL == pSocket->event_receive_handler)

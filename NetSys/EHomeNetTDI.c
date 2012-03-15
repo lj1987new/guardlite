@@ -5,6 +5,7 @@
 #include "EhomeDevCtl.h"
 #include <TdiKrnl.h>
 #include "Keyword.h"
+#include "TdiFileObjectContext.h"
 
 typedef struct _tdi_client_irp_ctx {
 	PIO_COMPLETION_ROUTINE	completion;
@@ -27,10 +28,10 @@ NTSTATUS tdi_close_connect(PFILE_OBJECT pFileObject);
 NTSTATUS		EHomeTDISetEventHandler(PIRP pIrp, PIO_STACK_LOCATION pStack)
 {
 	PTDI_REQUEST_KERNEL_SET_EVENT			pTdiEvent			= NULL;
-	PTDI_SOCKET_CONTEXT						pSocketContext		= NULL;
+	tdi_foc_ptr						pSocketContext		= NULL;
 
 	pTdiEvent = (PTDI_REQUEST_KERNEL_SET_EVENT)&pStack->Parameters;
-	pSocketContext = TdiSocketContextGetAddress(pStack->FileObject, TRUE);
+	pSocketContext = tdi_foc_GetAddress(pStack->FileObject, TRUE);
 	if(NULL == pSocketContext || NULL == pTdiEvent)
 	{
 		KdPrint(("[EHomeTDISetEventHandler] pSocketContext: %d, pTdiEvent: %d\n", pSocketContext, pTdiEvent));
@@ -68,12 +69,12 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 								 , IN ULONG  ReceiveFlags, IN ULONG  BytesIndicated, IN ULONG  BytesAvailable
 								 , OUT ULONG  *BytesTaken, IN PVOID  Tsdu, OUT PIRP  *IoRequestPacket)
 {
-	PTDI_SOCKET_CONTEXT						pSocketContext		= NULL;
+	tdi_foc_ptr						pSocketContext		= NULL;
 	NTSTATUS								status				= STATUS_SUCCESS;
 	char*									pData				= NULL;
 	BOOLEAN									bContinue			= TRUE;
 
-	pSocketContext = TdiSocketContextGetAddress((PFILE_OBJECT)TdiEventContext, FALSE);
+	pSocketContext = tdi_foc_GetAddress((PFILE_OBJECT)TdiEventContext, FALSE);
 	if(NULL == pSocketContext || NULL == pSocketContext->event_receive_handler)
 	{
 		KdPrint(("[EHomeClientEventReceive] pSocketContext: %d\n", pSocketContext));
@@ -197,12 +198,12 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 										, IN ULONG  ReceiveFlags, IN ULONG  ReceiveLength, IN ULONG  StartingOffset
 										, IN PMDL  Tsdu, IN PVOID  TsduDescriptor)
 {
-	PTDI_SOCKET_CONTEXT						pSocketContext		= NULL;
+	tdi_foc_ptr						pSocketContext		= NULL;
 	NTSTATUS								status				= STATUS_SUCCESS;
 	char*									pData				= NULL;
 	BOOLEAN									bContinue			= TRUE;
 
-	pSocketContext = TdiSocketContextGetAddress((PFILE_OBJECT)TdiEventContext, FALSE);
+	pSocketContext = tdi_foc_GetAddress((PFILE_OBJECT)TdiEventContext, FALSE);
 	if(NULL == pSocketContext || NULL == pSocketContext->event_receive_handler)
 	{
 		KdPrint(("[EHomeClientEventChainedReceive] pSocketContext: %d\n", pSocketContext));
@@ -247,7 +248,7 @@ void EHomeReplaceKeyword(IN PVOID pData, IN ULONG nLen)
 		int				nSurplusLen		= nLen;
 		int				i;
 
-		while( KeywordFind(pKeyWord, nSurplusLen, &pKeyWord, &nKeywordLen) )
+		while( keyword_Find(pKeyWord, nSurplusLen, &pKeyWord, &nKeywordLen) )
 		{
 			for(i = 0; i < nKeywordLen; i++)
 				pKeyWord[i] = '*';
@@ -301,7 +302,7 @@ void EHomeFilterRecvData(IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue)
 		PIRP					pIrp				= NULL;
 		IO_STATUS_BLOCK			IoStatusBlock		= {0};
 
-		if( FALSE == KeywordFind(pData, nLen, &pKeyword, &nKeywordLen) )
+		if( FALSE == keyword_Find(pData, nLen, &pKeyword, &nKeywordLen) )
 			return;
  		// ¶Ï¿ªÁ¬½Ó
 		*pbContinue = FALSE;

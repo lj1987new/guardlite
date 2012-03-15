@@ -3,7 +3,7 @@
 #include <ntddk.h>
 #include "tdi.h"
 #include "TdiKrnl.h"
-#include "TdiSocketContext.h"
+#include "TdiFileObjectContext.h"
 
 #define NO_UNLOAD
 
@@ -65,7 +65,7 @@ void		EhomeClear();
 NTSTATUS	DispatchRoutineComplate(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN PVOID Context);
 // 断网功能
 NTSTATUS	CheckNetwork(PIO_STACK_LOCATION pStack, PDEVICE_EXTENTION pDevExt, char* pProcName);	
-NTSTATUS	CheckUrl(char* pHttpPacket, int nHttpLen, PASSOCIATE_ADDRESS pAddress, BOOLEAN* pIsHttp);
+NTSTATUS	CheckUrl(char* pHttpPacket, int nHttpLen, tdi_foc_connection_ptr pAddress, BOOLEAN* pIsHttp);
 void		HttpRequestEraseFlag(char* pHttpRequest, int nHttpLen);
 
 // 处理关键字过滤
