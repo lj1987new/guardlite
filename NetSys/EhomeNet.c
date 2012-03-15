@@ -231,6 +231,12 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 		{
 			BOOLEAN		bIsHttp			= pAddress->bChecked;
 			
+			if( FALSE != pSocketContext->bStopOption )
+			{
+				status = STATUS_INVALID_CONNECTION;
+				goto stopirp;
+			}
+			
 			status = STATUS_SUCCESS;
 			httpPacket = (char*)MmGetSystemAddressForMdlSafe(irp->MdlAddress, NormalPagePriority);
 			if(FALSE == pAddress->bChecked)
@@ -290,27 +296,17 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 	}
 	else if(TDI_RECEIVE == stack->MinorFunction)
 	{
-// 		ULONG									nReceiveLen			= ((PTDI_REQUEST_KERNEL_RECEIVE)&stack->Parameters)->ReceiveLength;
-// 		PVOID									pReceiveData		= MmGetSystemAddressForMdlSafe(irp->MdlAddress, NormalPagePriority);
-// 		tdi_foc_ptr						pSocketConnect		= tdi_foc_GetConnection(stack->FileObject, FALSE);
-// 		tdi_foc_ptr						pSocketContext;
-// 		BOOLEAN									bContinue			= TRUE;
-// 
-// 		KdPrint(("[EhomeInternalDevCtl] TDI_RECEIVE len: %d, data: %s\n", nReceiveLen, pReceiveData));
-// 		if(NULL != pSocketConnect)
-// 			pSocketContext = tdi_foc_GetAddress(pSocketConnect->pConnectFileObj, FALSE);
-// 		else
-// 			pSocketConnect = tdi_foc_GetAddress(stack->FileObject, FALSE);
-// 		if(NULL == pReceiveData || NULL == pSocketContext)
-// 			goto skipirp;
-// 		if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
-// 		{
-// 			EHomeFilterRecvData(pReceiveData, nReceiveLen, &bContinue);
-// 			if( FALSE == bContinue )
-// 				goto skipirp;
-// 		}
+		tdi_client_irp_ctx*		new_ctx = (tdi_client_irp_ctx *)ExAllocatePoolWithTag(NonPagedPool, sizeof(tdi_client_irp_ctx), 'ehom');
+
+		if(NULL != new_ctx)
+		{
+			new_ctx->context = NULL;
+			new_ctx->addrobj = stack->FileObject;
+			new_ctx->completion = NULL;
+			new_ctx->old_control = 0;
+		}
 		IoCopyCurrentIrpStackLocationToNext(irp);
-		IoSetCompletionRoutine(irp, tdi_client_irp_complete, NULL, TRUE, TRUE, TRUE);
+		IoSetCompletionRoutine(irp, tdi_client_irp_complete, new_ctx, TRUE, TRUE, TRUE);
 		status = IoCallDriver(DevExt->LowTcpDev, irp);
 		return status;
 	}

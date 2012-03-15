@@ -39,6 +39,14 @@ typedef struct _EHOME_FILTER_RULE{
 	int				rule;		/* 0: 停止过滤, >0: 发现关键字替换, <0: 发现关键字断开*/
 }EHOME_FILTER_RULE, *PEHOME_FILTER_RULE;
 
+typedef struct _tdi_client_irp_ctx {
+	PIO_COMPLETION_ROUTINE	completion;
+	PVOID					context;
+	UCHAR					old_control;
+	PFILE_OBJECT            addrobj;
+}tdi_client_irp_ctx;
+
+
 NTSTATUS	Ehomedisp(PDEVICE_OBJECT pDevObj,PIRP irp);
 NTSTATUS	EhomeCreate(PDEVICE_OBJECT pDevObj,PIRP irp);
 NTSTATUS	EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp);
