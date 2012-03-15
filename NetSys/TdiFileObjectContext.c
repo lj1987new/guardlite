@@ -195,7 +195,7 @@ BOOLEAN tdi_foc_CheckConnection(PFILE_OBJECT fileObj, tdi_foc_connection_ptr* pA
 	*ppSockConnect = tdi_foc_GetConnection(fileObj, FALSE);
 	if(NULL != *ppSockConnect)
 	{
-		*pAddress = &( (*ppSockConnect)->address );
+		*pAddress = &( (*ppSockConnect)->connecation );
 	}
 	return NULL != *pAddress;
 }

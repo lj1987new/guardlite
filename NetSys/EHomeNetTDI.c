@@ -40,8 +40,8 @@ NTSTATUS		EHomeTDISetEventHandler(PIRP pIrp, PIO_STACK_LOCATION pStack)
 
 	if(TDI_EVENT_RECEIVE == pTdiEvent->EventType)
 	{
-		pSocketContext->event_receive_handler = pTdiEvent->EventHandler;
-		pSocketContext->event_receive_context = pTdiEvent->EventContext;
+		pSocketContext->address.event_receive_handler = pTdiEvent->EventHandler;
+		pSocketContext->address.event_receive_context = pTdiEvent->EventContext;
 		if(NULL != pTdiEvent->EventHandler)
 		{
 			pTdiEvent->EventHandler = EHomeClientEventReceive;
@@ -51,8 +51,8 @@ NTSTATUS		EHomeTDISetEventHandler(PIRP pIrp, PIO_STACK_LOCATION pStack)
 	}
 	else if(TDI_EVENT_CHAINED_RECEIVE == pTdiEvent->EventType)
 	{
-		pSocketContext->event_chained_handler = pTdiEvent->EventHandler;
-		pSocketContext->event_chained_context = pTdiEvent->EventContext;
+		pSocketContext->address.event_chained_handler = pTdiEvent->EventHandler;
+		pSocketContext->address.event_chained_context = pTdiEvent->EventContext;
  		if(NULL != pTdiEvent->EventHandler)
 		{
 			pTdiEvent->EventHandler = EHomeClientEventChainedReceive;
@@ -75,7 +75,7 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 	BOOLEAN									bContinue			= TRUE;
 
 	pSocketContext = tdi_foc_GetAddress((PFILE_OBJECT)TdiEventContext, FALSE);
-	if(NULL == pSocketContext || NULL == pSocketContext->event_receive_handler)
+	if(NULL == pSocketContext || NULL == pSocketContext->address.event_receive_handler)
 	{
 		KdPrint(("[EHomeClientEventReceive] pSocketContext: %d\n", pSocketContext));
 		return STATUS_SUCCESS;
@@ -88,8 +88,8 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 			return STATUS_SUCCESS;
 	}
 	// 调用原来的接收例程
-	status = ((PTDI_IND_RECEIVE)pSocketContext->event_receive_handler)
-		/*TdiDefaultReceiveHandler*/(pSocketContext->event_receive_context
+	status = ((PTDI_IND_RECEIVE)pSocketContext->address.event_receive_handler)
+		/*TdiDefaultReceiveHandler*/(pSocketContext->address.event_receive_context
 		, ConnectionContext
 		, ReceiveFlags
 		, BytesIndicated
@@ -204,7 +204,7 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 	BOOLEAN									bContinue			= TRUE;
 
 	pSocketContext = tdi_foc_GetAddress((PFILE_OBJECT)TdiEventContext, FALSE);
-	if(NULL == pSocketContext || NULL == pSocketContext->event_receive_handler)
+	if(NULL == pSocketContext || NULL == pSocketContext->address.event_receive_handler)
 	{
 		KdPrint(("[EHomeClientEventChainedReceive] pSocketContext: %d\n", pSocketContext));
 		return STATUS_SUCCESS;
@@ -225,9 +225,9 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 		}
 	}
 	// 调用原来的接收例程
-	status = ((PTDI_IND_CHAINED_RECEIVE)pSocketContext->event_chained_handler)
+	status = ((PTDI_IND_CHAINED_RECEIVE)pSocketContext->address.event_chained_handler)
 		/*TdiDefaultChainedReceiveHandler*/(
-		pSocketContext->event_chained_context
+		pSocketContext->address.event_chained_context
 		, ConnectionContext
 		, ReceiveFlags
 		, ReceiveLength

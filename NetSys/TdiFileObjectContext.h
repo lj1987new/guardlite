@@ -12,6 +12,13 @@ typedef struct
 } tdi_foc_connection, *tdi_foc_connection_ptr;
 
 /* 地址对像使作结构体 */
+typedef struct  
+{
+	PVOID					event_receive_handler;
+	PVOID					event_receive_context;
+	PVOID					event_chained_handler;
+	PVOID					event_chained_context;
+} tdi_foc_address;
 
 /* TDI结构体 */
 typedef struct {
@@ -20,11 +27,11 @@ typedef struct {
 	PFILE_OBJECT			pAddressFileObj;		/* 本地地址对像 */
 	PFILE_OBJECT			pConnectFileObj;		/* 连接端口对像 */
 	BOOLEAN					bIsHttp;				/* 是否HTTP协议 */
-	PVOID					event_receive_handler;
-	PVOID					event_receive_context;
-	PVOID					event_chained_handler;
-	PVOID					event_chained_context;
-	tdi_foc_connection		address;				/* 地址信息 */
+	union
+	{
+		tdi_foc_address			address;			/* 地址对像扩展数据 */
+		tdi_foc_connection		connecation;		/* 连接对像扩展数据 */
+	};
 } tdi_foc, *tdi_foc_ptr;
 
 // 基础函数
