@@ -27,6 +27,7 @@ typedef struct {
 	PFILE_OBJECT			pAddressFileObj;		/* 本地地址对像 */
 	PFILE_OBJECT			pConnectFileObj;		/* 连接端口对像 */
 	BOOLEAN					bIsHttp;				/* 是否HTTP协议 */
+	BOOLEAN					bStopOption;			/* 是否阻止连接 */
 	union
 	{
 		tdi_foc_address			address;			/* 地址对像扩展数据 */

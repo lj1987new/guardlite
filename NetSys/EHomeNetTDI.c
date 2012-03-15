@@ -7,13 +7,6 @@
 #include "Keyword.h"
 #include "TdiFileObjectContext.h"
 
-typedef struct _tdi_client_irp_ctx {
-	PIO_COMPLETION_ROUTINE	completion;
-	PVOID					context;
-	UCHAR					old_control;
-	PFILE_OBJECT            connobj;
-}tdi_client_irp_ctx;
-
 NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEXT  ConnectionContext
 								 , IN ULONG  ReceiveFlags, IN ULONG  BytesIndicated, IN ULONG  BytesAvailable
 								 , OUT ULONG  *BytesTaken, IN PVOID  Tsdu, OUT PIRP  *IoRequestPacket);
@@ -28,7 +21,7 @@ NTSTATUS tdi_close_connect(PFILE_OBJECT pFileObject);
 NTSTATUS		EHomeTDISetEventHandler(PIRP pIrp, PIO_STACK_LOCATION pStack)
 {
 	PTDI_REQUEST_KERNEL_SET_EVENT			pTdiEvent			= NULL;
-	tdi_foc_ptr						pSocketContext		= NULL;
+	tdi_foc_ptr								pSocketContext		= NULL;
 
 	pTdiEvent = (PTDI_REQUEST_KERNEL_SET_EVENT)&pStack->Parameters;
 	pSocketContext = tdi_foc_GetAddress(pStack->FileObject, TRUE);
@@ -69,23 +62,32 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 								 , IN ULONG  ReceiveFlags, IN ULONG  BytesIndicated, IN ULONG  BytesAvailable
 								 , OUT ULONG  *BytesTaken, IN PVOID  Tsdu, OUT PIRP  *IoRequestPacket)
 {
-	tdi_foc_ptr						pSocketContext		= NULL;
+	tdi_foc_ptr								pSocketContext		= NULL;
 	NTSTATUS								status				= STATUS_SUCCESS;
 	char*									pData				= NULL;
 	BOOLEAN									bContinue			= TRUE;
 
+	KdPrint(("[EHomeClientEventReceive] len:%d, data: %s\n", BytesIndicated, Tsdu));
 	pSocketContext = tdi_foc_GetAddress((PFILE_OBJECT)TdiEventContext, FALSE);
 	if(NULL == pSocketContext || NULL == pSocketContext->address.event_receive_handler)
 	{
 		KdPrint(("[EHomeClientEventReceive] pSocketContext: %d\n", pSocketContext));
 		return STATUS_SUCCESS;
 	}
-	KdPrint(("[EHomeClientEventReceive] len:%d, data: %s\n", BytesIndicated, Tsdu));
+	// 如果是断开的就执行取消操作
+	if( FALSE != pSocketContext->bStopOption )
+	{
+		return STATUS_SUCCESS;
+	}
+
 	if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
 	{
 		EHomeFilterRecvData( Tsdu, BytesIndicated, &bContinue );
 		if( FALSE == bContinue )
+		{
+			pSocketContext->bStopOption = TRUE;
 			return STATUS_SUCCESS;
+		}
 	}
 	// 调用原来的接收例程
 	status = ((PTDI_IND_RECEIVE)pSocketContext->address.event_receive_handler)
@@ -105,7 +107,7 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 
 		if(NULL != new_ctx)
 		{
-			new_ctx->connobj = pSocketContext->pAddressFileObj;
+			new_ctx->addrobj = pSocketContext->pAddressFileObj;
 
 			if (irps->CompletionRoutine != NULL) {
 				new_ctx->completion = irps->CompletionRoutine;
@@ -131,8 +133,20 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 
 NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN PVOID Context)
 {
-	tdi_client_irp_ctx *ctx = (tdi_client_irp_ctx *)Context;
-	NTSTATUS status;
+	tdi_client_irp_ctx *		ctx					= (tdi_client_irp_ctx *)Context;
+	tdi_foc_ptr					pSockContext		= NULL;
+	NTSTATUS					status;
+
+	if(NULL != ctx)
+	{
+		pSockContext = tdi_foc_GetAddress(ctx->addrobj, FALSE);
+		if( NULL != pSockContext && FALSE != pSockContext->bStopOption)
+		{
+			Irp->IoStatus.Information = 0;
+			Irp->IoStatus.Status = STATUS_INVALID_CONNECTION;
+			return STATUS_SUCCESS;
+		}
+	}
 
 	if (Irp->IoStatus.Status == STATUS_SUCCESS) 
 	{
@@ -143,6 +157,8 @@ NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN
 		EHomeFilterRecvData(pData, Irp->IoStatus.Information, &bContinue);
 		if(FALSE == bContinue)
 		{
+			if( NULL != pSockContext )
+				pSockContext->bStopOption = TRUE;
 			Irp->IoStatus.Information = 0;
 			Irp->IoStatus.Status = STATUS_INVALID_CONNECTION;
 			return STATUS_SUCCESS;
@@ -198,7 +214,7 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 										, IN ULONG  ReceiveFlags, IN ULONG  ReceiveLength, IN ULONG  StartingOffset
 										, IN PMDL  Tsdu, IN PVOID  TsduDescriptor)
 {
-	tdi_foc_ptr						pSocketContext		= NULL;
+	tdi_foc_ptr								pSocketContext		= NULL;
 	NTSTATUS								status				= STATUS_SUCCESS;
 	char*									pData				= NULL;
 	BOOLEAN									bContinue			= TRUE;
@@ -215,11 +231,18 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 		KdPrint(("[EHomeClientEventChainedReceive] %s \n", pData));
 	}
 	KdPrint(("[EHomeClientEventChainedReceive] len:%d, data: %s\n", ReceiveLength, (char *)pData + StartingOffset));
+	// 如果是取消息的就停止接收
+	if( FALSE != pSocketContext->bStopOption )
+	{
+		return STATUS_SUCCESS;
+	}
+
 	if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
 	{
 		EHomeFilterRecvData((char *)pData + StartingOffset, ReceiveLength, &bContinue);
 		if( FALSE == bContinue )
 		{
+			pSocketContext->bStopOption = TRUE;
 			tdi_close_connect(pSocketContext->pAddressFileObj);
 			return STATUS_SUCCESS;
 		}
@@ -312,21 +335,5 @@ void EHomeFilterRecvData(IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue)
 /* 关闭连接 */
 NTSTATUS tdi_close_connect(PFILE_OBJECT pFileObject)
 {
-// 	KEVENT						Event;
-// 	NTSTATUS					Status;
-// 	PDEVICE_OBJECT				DeviceObject;
-// 	IO_STATUS_BLOCK				IoStatus			= {0}; 
-// 	PIRP						Irp;
-// 
-// 	KeInitializeEvent(&Event, NotificationEvent, FALSE); 
-// 	DeviceObject = IoGetRelatedDeviceObject(pFileObject); 
-// 	Irp = TdiBuildInternalDeviceControlIrp(TDI_DISCONNECT, DeviceObject, pFileObject, NULL, NULL); 
-// 	if (Irp == 0)
-// 		return STATUS_INSUFFICIENT_RESOURCES; 
-// 	TdiBuildDisconnect(Irp, DeviceObject, pFileObject, 0, 0, 0, TDI_DISCONNECT_RELEASE, 0, 0); 
-// 	Status = Status = IoCallDriver(DeviceObject, Irp);
-// 
-// 	return Status == STATUS_SUCCESS ? IoStatus.Status : Status; 
-
 	return STATUS_SUCCESS;
 }
