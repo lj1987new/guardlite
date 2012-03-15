@@ -29,9 +29,9 @@ typedef struct {
 
 // 基础函数
 BOOLEAN						tdi_foc_Init();
-tdi_foc_ptr			tdi_foc_Get(PFILE_OBJECT pAddressFileObj);
-tdi_foc_ptr			tdi_foc_GetAddress(PFILE_OBJECT pAddressFileObj, BOOLEAN bCreate);
-tdi_foc_ptr			tdi_foc_GetConnection(PFILE_OBJECT pConnectFileObj, BOOLEAN bCreate);
+tdi_foc_ptr					tdi_foc_Get(PFILE_OBJECT pAddressFileObj);
+tdi_foc_ptr					tdi_foc_GetAddress(PFILE_OBJECT pAddressFileObj, BOOLEAN bCreate);
+tdi_foc_ptr					tdi_foc_GetConnection(PFILE_OBJECT pConnectFileObj, BOOLEAN bCreate);
 void						tdi_foc_Erase(PFILE_OBJECT pAddressFileObj);
 void						tdi_foc_Release();
 // 扩展函数
