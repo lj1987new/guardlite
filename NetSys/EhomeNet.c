@@ -812,9 +812,9 @@ NTSTATUS EhomeConnectComRoutine(
 
 	if(pSockConnect)
 	{
-		pSockConnect->address.IPAdd = IPAdd;
-		pSockConnect->address.Port = port;
-		pSockConnect->address.bChecked = FALSE;
+		pSockConnect->connecation.IPAdd = IPAdd;
+		pSockConnect->connecation.Port = port;
+		pSockConnect->connecation.bChecked = FALSE;
 		KdPrint(("[EhomeConnectComRoutine] find conenct: fileobj=%x\n", stack->FileObject));
 	}
 		
