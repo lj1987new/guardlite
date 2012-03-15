@@ -6,6 +6,6 @@ C_DEFINES=
 
 SOURCES = EhomeNet.c \
 		  EHomeNetTDI.c \
-		  TdiSocketContext.c \
+		  TdiFileObjectContext.c \
 		  Keyword.c \
 

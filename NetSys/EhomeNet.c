@@ -114,8 +114,8 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 		goto failed;
 	}
 	// 初始化
-	TdiSocketContextInit();
-	KeywordInit();
+	tdi_foc_Init();
+	keyword_Init();
 	// 附加过滤设备到"\\Device\\Tcp"的设备栈
 	LowTcpDevObj = IoAttachDeviceToDeviceStack(EhomefltDev, TcpDevobj);
 	LowUdpDevObj = IoAttachDeviceToDeviceStack(EhomefltUdpDev, UdpDevobj);
@@ -154,8 +154,8 @@ failed:
 	// 失败后清除分配的内存
 	gEhomeClear = 0L;
 	EhomeClear();
-	TdiSocketContextRelease();
-	KeywordDestroy();
+	tdi_foc_Release();
+	keyword_Release();
 	// 失败后删除创建的设备
 	if(NULL != EhomeCtlDev)
 		IoDeleteDevice(EhomeCtlDev);
@@ -192,7 +192,7 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 	int							lenth;
 	TDI_REQUEST_KERNEL *		req;
 	TDI_REQUEST_KERNEL_SENDDG*	requdp;
-	PASSOCIATE_ADDRESS			pAddress		= NULL;
+	tdi_foc_connection_ptr			pAddress		= NULL;
 
 	InterlockedIncrement(&gRefCount);
 	stack = IoGetCurrentIrpStackLocation(irp);	
@@ -220,14 +220,14 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 	// 普通监控模式
 	if(stack->MinorFunction == TDI_SEND)
 	{
-		PTDI_SOCKET_CONTEXT		pSocketContext		= NULL;
+		tdi_foc_ptr		pSocketContext		= NULL;
 
 		if(0 == IsHttpFilterOn)
 			goto skipirp;
 		// 发送数据过滤过理
 		reqSend = (TDI_REQUEST_KERNEL_SEND *)&stack->Parameters;
 		// 过滤多端口数据
-		if(IsTcpRequest(stack->FileObject, &pAddress, &pSocketContext))
+		if(tdi_foc_CheckConnection(stack->FileObject, &pAddress, &pSocketContext))
 		{
 			BOOLEAN		bIsHttp			= pAddress->bChecked;
 			
@@ -250,7 +250,7 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 				// 清除标记，使其不会再次被获取
 				if(FALSE != bIsHttp)
 				{
-					PTDI_SOCKET_CONTEXT		pSockAddress		= TdiSocketContextGetAddress(pSocketContext->pConnectFileObj, FALSE);
+					tdi_foc_ptr		pSockAddress		= tdi_foc_GetAddress(pSocketContext->pConnectFileObj, FALSE);
 
 					pAddress->bChecked = TRUE;
 					pSockAddress->bIsHttp = TRUE;
@@ -292,15 +292,15 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 	{
 // 		ULONG									nReceiveLen			= ((PTDI_REQUEST_KERNEL_RECEIVE)&stack->Parameters)->ReceiveLength;
 // 		PVOID									pReceiveData		= MmGetSystemAddressForMdlSafe(irp->MdlAddress, NormalPagePriority);
-// 		PTDI_SOCKET_CONTEXT						pSocketConnect		= TdiSocketContextGetConnect(stack->FileObject, FALSE);
-// 		PTDI_SOCKET_CONTEXT						pSocketContext;
+// 		tdi_foc_ptr						pSocketConnect		= tdi_foc_GetConnection(stack->FileObject, FALSE);
+// 		tdi_foc_ptr						pSocketContext;
 // 		BOOLEAN									bContinue			= TRUE;
 // 
 // 		KdPrint(("[EhomeInternalDevCtl] TDI_RECEIVE len: %d, data: %s\n", nReceiveLen, pReceiveData));
 // 		if(NULL != pSocketConnect)
-// 			pSocketContext = TdiSocketContextGetAddress(pSocketConnect->pConnectFileObj, FALSE);
+// 			pSocketContext = tdi_foc_GetAddress(pSocketConnect->pConnectFileObj, FALSE);
 // 		else
-// 			pSocketConnect = TdiSocketContextGetAddress(stack->FileObject, FALSE);
+// 			pSocketConnect = tdi_foc_GetAddress(stack->FileObject, FALSE);
 // 		if(NULL == pReceiveData || NULL == pSocketContext)
 // 			goto skipirp;
 // 		if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
@@ -318,14 +318,14 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 	{
 		// 关连地址对像和端口对像
 		PFILE_OBJECT			pAddressFileObj		= NULL;
-		PTDI_SOCKET_CONTEXT		pSocketAddress		= NULL;
-		PTDI_SOCKET_CONTEXT		pSocketConnet		= NULL;
+		tdi_foc_ptr		pSocketAddress		= NULL;
+		tdi_foc_ptr		pSocketConnet		= NULL;
 
 		status = ObReferenceObjectByHandle(((PTDI_REQUEST_KERNEL_ASSOCIATE)&stack->Parameters)->AddressHandle
 			, FILE_ANY_ACCESS, 0, KernelMode, (PVOID *)&pAddressFileObj, NULL);
 		KdPrint(("[EhomeInternalDevCtl] TDI_ASSOCIATE_ADDRESS PortObj: %x, AddrObj: %x \n", stack->FileObject, pAddressFileObj));
-		pSocketAddress = TdiSocketContextGetAddress(pAddressFileObj, TRUE);
-		pSocketConnet = TdiSocketContextGetConnect(stack->FileObject, TRUE);
+		pSocketAddress = tdi_foc_GetAddress(pAddressFileObj, TRUE);
+		pSocketConnet = tdi_foc_GetConnection(stack->FileObject, TRUE);
 		// 地址对像
 		if(NULL != pSocketAddress)
 		{
@@ -443,7 +443,7 @@ irpstop:
 	return status;
 }
 // 检测网址
-NTSTATUS CheckUrl(char* pHttpPacket, int nHttpLen, PASSOCIATE_ADDRESS pAddress, BOOLEAN* pIsHttp)
+NTSTATUS CheckUrl(char* pHttpPacket, int nHttpLen, tdi_foc_connection_ptr pAddress, BOOLEAN* pIsHttp)
 {
 	int					nFindLabel		= 0;
 	char*				pNextLine		= pHttpPacket;
@@ -711,13 +711,13 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 		{
 			if(uInSize > 0)
 			{
-				KeywordAdd((char *)buf, uInSize);
+				keyword_Add((char *)buf, uInSize);
 			}
 		}
 		break;
 	case IOCTL_CONTROL_FILTER_CLEARKEYWORD:
 		{
-			KeywordClear();
+			keyword_Clear();
 		}
 		break;
 	}
@@ -743,9 +743,9 @@ NTSTATUS EhomeCloseCleanup(PDEVICE_OBJECT pDevObj,PIRP irp)
 	stack = IoGetCurrentIrpStackLocation(irp);
 	if(pDevObj != EhomeCtlDev)
 	{
-		PTDI_SOCKET_CONTEXT		pSockConnet		= TdiSocketContextGetConnect(stack->FileObject, TRUE);
+		tdi_foc_ptr		pSockConnet		= tdi_foc_GetConnection(stack->FileObject, TRUE);
 		// 过滤设备直接跳过
-		TdiSocketContextErase(stack->FileObject);
+		tdi_foc_Erase(stack->FileObject);
 #ifdef NO_UNLOAD
 		IoSkipCurrentIrpStackLocation(irp);
 #else
@@ -789,7 +789,7 @@ NTSTATUS EhomeConnectComRoutine(
 {
 	KIRQL					oldIrql;
 	PIO_STACK_LOCATION		stack			= IoGetCurrentIrpStackLocation(irp);
-	PTDI_SOCKET_CONTEXT		pSockConnect	= NULL;
+	tdi_foc_ptr		pSockConnect	= NULL;
 	TA_ADDRESS *			remote_addr;
 	USHORT					port;
 	ULONG					IPAdd;
@@ -808,7 +808,7 @@ NTSTATUS EhomeConnectComRoutine(
 	//		DbgPrint("CompleteRoutine fileObj is:%x PORT is:%d \n",stack->FileObject,port);
 
 	// 添加到监控链表
-	pSockConnect = TdiSocketContextGetConnect(stack->FileObject, FALSE);
+	pSockConnect = tdi_foc_GetConnection(stack->FileObject, FALSE);
 
 	if(pSockConnect)
 	{

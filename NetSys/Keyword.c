@@ -6,95 +6,97 @@
 
 #define MAX_INDEX					256
 
-typedef struct _KeywordItem{
+typedef struct 
+{
 	LIST_ENTRY		list;
 	ULONG			nSize;
-}KEYWORDITEM, *PKEYWORDITEM;
+} keyword_item, *keyword_item_ptr;
 
-typedef struct _KeywordIndex{
+typedef struct 
+{
 	BOOLEAN			iskey;
 	LIST_ENTRY		list;
-}KEYWORDINDEX, *PKEYWORDINDEX;
+} keyword_index, *keyword_index_ptr;
 
-KMUTEX			gKeywordMutex			= {0};
-PKEYWORDINDEX	gKeywordIndex			= NULL;
+KMUTEX				g_keyword_Mutex			= {0};
+keyword_index_ptr	g_keyword_Index			= NULL;
 
 /* 初始化关键字 */
-void KeywordInit()
+void keyword_Init()
 {
 	int			i		= 0;
 
-	KeInitializeMutex(&gKeywordMutex, 0);
-	gKeywordIndex = (PKEYWORDINDEX)ExAllocatePoolWithTag(NonPagedPool, sizeof(KEYWORDINDEX) * MAX_INDEX, 'ehom');
-	ASSERT(NULL != gKeywordIndex);
-	if(NULL == gKeywordIndex)
+	KeInitializeMutex(&g_keyword_Mutex, 0);
+	g_keyword_Index = (keyword_index_ptr)ExAllocatePoolWithTag(NonPagedPool, sizeof(keyword_index) * MAX_INDEX, 'ehom');
+	ASSERT(NULL != g_keyword_Index);
+	if(NULL == g_keyword_Index)
 		return;
 	for(i = 0; i < MAX_INDEX; i++)
 	{
-		InitializeListHead(&gKeywordIndex[i].list);
-		gKeywordIndex[i].iskey = FALSE;
+		InitializeListHead(&g_keyword_Index[i].list);
+		g_keyword_Index[i].iskey = FALSE;
 	}
 }
 
 /* 销毁关键字 */
-void KeywordDestroy()
+void keyword_Release()
 {
 	int					i				= 0;
 	PLIST_ENTRY			pList			= NULL;
-	PKEYWORDITEM		pKeywordItem	= NULL;
+	keyword_item_ptr		pKeywordItem	= NULL;
 
-	KeWaitForSingleObject(&gKeywordMutex, Executive, KernelMode, FALSE, NULL); 
-	if(NULL != gKeywordIndex)
+	KeWaitForSingleObject(&g_keyword_Mutex, Executive, KernelMode, FALSE, NULL); 
+	if(NULL != g_keyword_Index)
 	{
 		for(i = 0; i < MAX_INDEX; i++)
 		{
-			for(pList = gKeywordIndex[i].list.Blink
-				; pList != &gKeywordIndex[i].list
+			for(pList = g_keyword_Index[i].list.Blink
+				; pList != &g_keyword_Index[i].list
 			; pList = pList->Blink)
 			{
-				pKeywordItem = CONTAINING_RECORD(pList, KEYWORDITEM, list);
+				pKeywordItem = CONTAINING_RECORD(pList, keyword_item, list);
 				pList->Blink->Flink = pList->Flink;
 				pList->Flink->Blink = pList->Blink;
 				ExFreePoolWithTag(pKeywordItem, 'ehom');
 			}
 		}
-		ExFreePoolWithTag(gKeywordIndex, 'ehom');
-		gKeywordIndex = NULL;
+		ExFreePoolWithTag(g_keyword_Index, 'ehom');
+		g_keyword_Index = NULL;
 	}
-	KeReleaseMutex(&gKeywordMutex, FALSE);
+	KeReleaseMutex(&g_keyword_Mutex, FALSE);
 }
 
 /* 清除Keyword */
-void KeywordClear()
+void keyword_Clear()
 {
 	int					i				= 0;
 	PLIST_ENTRY			pList			= NULL;
-	PKEYWORDITEM		pKeywordItem	= NULL;
+	keyword_item_ptr		pKeywordItem	= NULL;
 
-	KeWaitForSingleObject(&gKeywordMutex, Executive, KernelMode, FALSE, NULL); 
-	if(NULL != gKeywordIndex)
+	KeWaitForSingleObject(&g_keyword_Mutex, Executive, KernelMode, FALSE, NULL); 
+	if(NULL != g_keyword_Index)
 	{
 		for(i = 0; i < MAX_INDEX; i++)
 		{
-			for(pList = gKeywordIndex[i].list.Blink
-				; pList != &gKeywordIndex[i].list
+			for(pList = g_keyword_Index[i].list.Blink
+				; pList != &g_keyword_Index[i].list
 				; pList = pList->Blink)
 			{
-				pKeywordItem = CONTAINING_RECORD(pList, KEYWORDITEM, list);
+				pKeywordItem = CONTAINING_RECORD(pList, keyword_item, list);
 				pList->Blink->Flink = pList->Flink;
 				pList->Flink->Blink = pList->Blink;
 				ExFreePoolWithTag(pKeywordItem, 'ehom');
 			}
-			gKeywordIndex[i].iskey = FALSE;
+			g_keyword_Index[i].iskey = FALSE;
 		}
 	}
-	KeReleaseMutex(&gKeywordMutex, FALSE);
+	KeReleaseMutex(&g_keyword_Mutex, FALSE);
 }
 
 /* 添加一个KEY */
-void KeywordAdd(char* pKeyword, ULONG nLen)
+void keyword_Add(char* pKeyword, ULONG nLen)
 {
-	PKEYWORDITEM		pKeyItem	= NULL;
+	keyword_item_ptr		pKeyItem	= NULL;
 	PLIST_ENTRY			pList		= NULL;
 	int					i;
 
@@ -111,20 +113,20 @@ void KeywordAdd(char* pKeyword, ULONG nLen)
 	if(0 == nLen)
 		return;
 	// 开始添加
-	KeWaitForSingleObject(&gKeywordMutex, Executive, KernelMode, FALSE, NULL);
-	if(NULL != gKeywordIndex)
+	KeWaitForSingleObject(&g_keyword_Mutex, Executive, KernelMode, FALSE, NULL);
+	if(NULL != g_keyword_Index)
 	{
 		UCHAR			uchar		= (UCHAR)pKeyword[0];
 		BOOL			bAdd		= TRUE;
 
-		for(pList = gKeywordIndex[uchar].list.Blink
-			; pList != &gKeywordIndex[uchar].list
+		for(pList = g_keyword_Index[uchar].list.Blink
+			; pList != &g_keyword_Index[uchar].list
 			; pList = pList->Blink)
 		{
-			pKeyItem = CONTAINING_RECORD(pList, KEYWORDITEM, list);
+			pKeyItem = CONTAINING_RECORD(pList, keyword_item, list);
 			if(nLen != pKeyItem->nSize)
 				continue;
-			if(memcmp((char *)pKeyItem + sizeof(KEYWORDITEM), pKeyword, nLen) == 0)
+			if(memcmp((char *)pKeyItem + sizeof(keyword_item), pKeyword, nLen) == 0)
 			{
 				bAdd = FALSE;
 				break;
@@ -132,40 +134,40 @@ void KeywordAdd(char* pKeyword, ULONG nLen)
 		}
 		if(bAdd)
 		{
-			pKeyItem = ExAllocatePoolWithTag(NonPagedPool, sizeof(KEYWORDITEM) + nLen, 'ehom');
+			pKeyItem = ExAllocatePoolWithTag(NonPagedPool, sizeof(keyword_item) + nLen, 'ehom');
 			if(NULL != pKeyItem)
 			{
 				pKeyItem->nSize = nLen;
-				memcpy((char*)pKeyItem + sizeof(KEYWORDITEM), pKeyword, nLen);
-				InsertHeadList(&gKeywordIndex[uchar].list, &pKeyItem->list);
-				gKeywordIndex[uchar].iskey = TRUE;
+				memcpy((char*)pKeyItem + sizeof(keyword_item), pKeyword, nLen);
+				InsertHeadList(&g_keyword_Index[uchar].list, &pKeyItem->list);
+				g_keyword_Index[uchar].iskey = TRUE;
 			}
 		}
 	}
-	KeReleaseMutex(&gKeywordMutex, FALSE);
+	KeReleaseMutex(&g_keyword_Mutex, FALSE);
 }
 
 /* 查找关键字 */
-BOOLEAN KeywordFind(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT int* pLenKeyWord)
+BOOLEAN keyword_Find(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT int* pLenKeyWord)
 {
 	int				i			= 0;
 	BOOLEAN			bFind		= FALSE;
 
-	KeWaitForSingleObject(&gKeywordMutex, Executive, KernelMode, FALSE, NULL);
+	KeWaitForSingleObject(&g_keyword_Mutex, Executive, KernelMode, FALSE, NULL);
 	for(i = 0; i < nLenData && FALSE == bFind; i++)
 	{
 		UCHAR				uchar		= (UCHAR)pData[i];
 		PLIST_ENTRY			pList;
-		PKEYWORDITEM		pKeyItem;
+		keyword_item_ptr		pKeyItem;
 
-		if(FALSE == gKeywordIndex[uchar].iskey)
+		if(FALSE == g_keyword_Index[uchar].iskey)
 			continue;	// 快束查找
-		for(pList = gKeywordIndex[uchar].list.Blink
-			; pList != &gKeywordIndex[uchar].list
+		for(pList = g_keyword_Index[uchar].list.Blink
+			; pList != &g_keyword_Index[uchar].list
 			; pList = pList->Blink)
 		{
-			pKeyItem = CONTAINING_RECORD(pList, KEYWORDITEM, list);
-			if(memcmp(pData+i, (char*)pKeyItem+sizeof(KEYWORDITEM), pKeyItem->nSize) == 0)
+			pKeyItem = CONTAINING_RECORD(pList, keyword_item, list);
+			if(memcmp(pData+i, (char*)pKeyItem+sizeof(keyword_item), pKeyItem->nSize) == 0)
 			{
 				bFind = TRUE;
 				*ppKeyWord = pData + i;
@@ -174,6 +176,6 @@ BOOLEAN KeywordFind(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT i
 			}
 		}
 	}
-	KeReleaseMutex(&gKeywordMutex, FALSE);
+	KeReleaseMutex(&g_keyword_Mutex, FALSE);
 	return bFind;
 }
