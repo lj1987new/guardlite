@@ -154,7 +154,7 @@ NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN
 		BOOLEAN		bContinue		= TRUE;	
 		
 		KdPrint(("[tdi_client_irp_complete] len:%d, data: %s\n", Irp->IoStatus.Information, pData));
-		EHomeFilterRecvData(pData, Irp->IoStatus.Information, &bContinue);
+		EHomeFilterRecvData(pData, (ULONG)Irp->IoStatus.Information, &bContinue);
 		if(FALSE == bContinue)
 		{
 			if( NULL != pSockContext )
@@ -276,7 +276,7 @@ void EHomeReplaceKeyword(IN PVOID pData, IN ULONG nLen)
 			for(i = 0; i < nKeywordLen; i++)
 				pKeyWord[i] = '*';
 			pKeyWord += 4;
-			nSurplusLen = nLen - ( pKeyWord - (char *)pData);
+			nSurplusLen = nLen - (int)( pKeyWord - (char *)pData);
 			if(nSurplusLen < 0)
 				break;
 		}

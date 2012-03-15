@@ -927,7 +927,7 @@ void		HttpRequestEraseFlag(char* pHttpRequest, int nHttpLen)
 	{
 		if(_strnicmp(pNextLine, "Accept-Encoding:", 16) == 0)
 		{
-			for(i = (pNextLine - pHttpRequest) + 16
+			for(i = (int)(pNextLine - pHttpRequest) + 16
 				; i < nHttpLen && '\x0' != pHttpRequest[i] && '\r' != pHttpRequest[i] && '\n' != pHttpRequest[i]
 				; i++)
 			{
@@ -937,7 +937,7 @@ void		HttpRequestEraseFlag(char* pHttpRequest, int nHttpLen)
 		else if(_strnicmp(pNextLine, "Cookie:", 7) == 0)
 		{
 			// 谷哥等网站会根据这个值来加密网页 - 特定征对谷哥网站
-			for(i = (pNextLine - pHttpRequest) + 7
+			for(i = (int)(pNextLine - pHttpRequest) + 7
 				; i < (nHttpLen - 6) && '\x0' != pHttpRequest[i] && '\r' != pHttpRequest[i] && '\n' != pHttpRequest[i]
 				; i++)
 			{
@@ -952,7 +952,7 @@ void		HttpRequestEraseFlag(char* pHttpRequest, int nHttpLen)
 			}
 		}
 		// 查找下一行
-		for(i = pNextLine - pHttpRequest; i < (nHttpLen - 1); i++)
+		for(i = (int)(pNextLine - pHttpRequest); i < (nHttpLen - 1); i++)
 		{
 			if('\r' == pHttpRequest[i])
 			{
