@@ -146,10 +146,10 @@ NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN
 	tdi_foc_ptr					pSockContext		= NULL;
 	NTSTATUS					status;
 
-	if(NULL != ctx)
+	if( 0 != gEHomeFilterRule.rule && NULL != ctx)
 	{
 		pSockContext = tdi_foc_GetAddress(ctx->addrobj, FALSE);
-		if( NULL != pSockContext && FALSE != pSockContext->bStopOption)
+		if( NULL != pSockContext && FALSE != pSockContext->bStopOption )
 		{
 			Irp->IoStatus.Information = 0;
 			Irp->IoStatus.Status = STATUS_INVALID_CONNECTION;
@@ -157,7 +157,7 @@ NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN
 		}
 	}
 
-	if (Irp->IoStatus.Status == STATUS_SUCCESS) 
+	if ( 0 != gEHomeFilterRule.rule && Irp->IoStatus.Status == STATUS_SUCCESS ) 
 	{
 		PVOID		pData			= MmGetSystemAddressForMdlSafe(Irp->MdlAddress, NormalPagePriority);
 		BOOLEAN		bContinue		= TRUE;	
