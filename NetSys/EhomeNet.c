@@ -300,10 +300,8 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 
 		if(NULL != new_ctx)
 		{
-			new_ctx->context = NULL;
+			RtlZeroMemory( new_ctx, sizeof(tdi_client_irp_ctx) );
 			new_ctx->addrobj = stack->FileObject;
-			new_ctx->completion = NULL;
-			new_ctx->old_control = 0;
 		}
 		IoCopyCurrentIrpStackLocationToNext(irp);
 		IoSetCompletionRoutine(irp, tdi_client_irp_complete, new_ctx, TRUE, TRUE, TRUE);

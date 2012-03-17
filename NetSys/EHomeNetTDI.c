@@ -77,16 +77,16 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 	// 如果是断开的就执行取消操作
 	if( FALSE != pSocketContext->bStopOption )
 	{
-		return STATUS_SUCCESS;
+		return STATUS_DATA_NOT_ACCEPTED;
 	}
-
+	// 替换关键字
 	if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
 	{
 		EHomeFilterRecvData( Tsdu, BytesIndicated, &bContinue );
 		if( FALSE == bContinue )
 		{
 			pSocketContext->bStopOption = TRUE;
-			return STATUS_SUCCESS;
+			return STATUS_DATA_NOT_ACCEPTED;
 		}
 	}
 	// 调用原来的接收例程
@@ -99,34 +99,43 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 		, BytesTaken
 		, Tsdu
 		, IoRequestPacket);
+	if( FALSE == pSocketContext->bIsHttp || 0 == gEHomeFilterRule.rule )
+		return status;
+	if(*BytesTaken == BytesAvailable)
+		return status; // 全部接收完成
+	// 验证返回是否有错误
+	if(STATUS_MORE_PROCESSING_REQUIRED  != status && STATUS_SUCCESS != status)
+		return status; // 如果返回的是 STATUS_DATA_NOT_ACCEPTED 表示后面的操作都无效
 	// 设置完成端口
 	if(NULL != *IoRequestPacket)
 	{
-		PIO_STACK_LOCATION		irps = IoGetCurrentIrpStackLocation(*IoRequestPacket);
-		tdi_client_irp_ctx*		new_ctx = (tdi_client_irp_ctx *)ExAllocatePoolWithTag(NonPagedPool, sizeof(tdi_client_irp_ctx), 'ehom');
+		PIO_STACK_LOCATION		irps				= NULL;
+		tdi_client_irp_ctx*		new_ctx				= NULL;
 
-		if(NULL != new_ctx)
+		irps = IoGetCurrentIrpStackLocation(*IoRequestPacket);
+		if( NULL == irps ) 
 		{
-			new_ctx->addrobj = pSocketContext->pAddressFileObj;
-
-			if (irps->CompletionRoutine != NULL) {
-				new_ctx->completion = irps->CompletionRoutine;
-				new_ctx->context = irps->Context;
-				new_ctx->old_control = irps->Control;
-
-			} else {
-
-				// we don't use IoSetCompletionRoutine because it uses next not current location
-
-				new_ctx->completion = NULL;
-				new_ctx->context = NULL;
-
-			}
-
-			irps->CompletionRoutine = tdi_client_irp_complete;
-			irps->Context = new_ctx;
-			irps->Control = SL_INVOKE_ON_SUCCESS | SL_INVOKE_ON_ERROR | SL_INVOKE_ON_CANCEL;
+			return status;
 		}
+		// 改变回调过程
+		new_ctx = (tdi_client_irp_ctx *)ExAllocatePoolWithTag(NonPagedPool, sizeof(tdi_client_irp_ctx), 'ehom');
+		if(NULL == new_ctx)
+		{
+			return status; // 分配内存失败
+		}
+
+		RtlZeroMemory( new_ctx, sizeof(tdi_client_irp_ctx) );
+		new_ctx->addrobj = pSocketContext->pAddressFileObj;
+		if(NULL != irps->CompletionRoutine)
+		{
+			new_ctx->completion = irps->CompletionRoutine;
+			new_ctx->context = irps->Context;
+			new_ctx->old_control = irps->Control;
+		}
+		// 设置完成事件
+		irps->CompletionRoutine = tdi_client_irp_complete;
+		irps->Context = new_ctx;
+		irps->Control = SL_INVOKE_ON_SUCCESS | SL_INVOKE_ON_ERROR | SL_INVOKE_ON_CANCEL;
 	}
 	return status;
 }
@@ -234,17 +243,15 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 	// 如果是取消息的就停止接收
 	if( FALSE != pSocketContext->bStopOption )
 	{
-		return STATUS_SUCCESS;
+		return STATUS_DATA_NOT_ACCEPTED;
 	}
-
-	if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
+	else if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
 	{
 		EHomeFilterRecvData((char *)pData + StartingOffset, ReceiveLength, &bContinue);
 		if( FALSE == bContinue )
 		{
 			pSocketContext->bStopOption = TRUE;
-			tdi_close_connect(pSocketContext->pAddressFileObj);
-			return STATUS_SUCCESS;
+			return STATUS_DATA_NOT_ACCEPTED;
 		}
 	}
 	// 调用原来的接收例程
