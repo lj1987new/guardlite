@@ -753,6 +753,7 @@ NTSTATUS EhomeCloseCleanup(PDEVICE_OBJECT pDevObj,PIRP irp)
 	IsHttpFilterOn = FALSE;
 	IsHttpAllow = TRUE;
 	gControlPID = NULL;
+	gEHomeFilterRule.rule = 0; // Í£Ö¹¼à¿Ø
 	irp->IoStatus.Status= STATUS_SUCCESS;
 	irp->IoStatus.Information = 0;
 	IoCompleteRequest(irp,IO_NO_INCREMENT);
