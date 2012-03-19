@@ -18,7 +18,7 @@ typedef struct
 	LIST_ENTRY		list;
 } keyword_index, *keyword_index_ptr;
 
-KMUTEX				g_keyword_Mutex			= {0};
+KSPIN_LOCK			g_keyword_SpinLock		= {0};
 keyword_index_ptr	g_keyword_Index			= NULL;
 
 /* 初始化关键字 */
@@ -26,7 +26,7 @@ void keyword_Init()
 {
 	int			i		= 0;
 
-	KeInitializeMutex(&g_keyword_Mutex, 0);
+	KeInitializeSpinLock(&g_keyword_SpinLock);
 	g_keyword_Index = (keyword_index_ptr)ExAllocatePoolWithTag(NonPagedPool, sizeof(keyword_index) * MAX_INDEX, 'ehom');
 	ASSERT(NULL != g_keyword_Index);
 	if(NULL == g_keyword_Index)
@@ -43,9 +43,10 @@ void keyword_Release()
 {
 	int					i				= 0;
 	PLIST_ENTRY			pList			= NULL;
-	keyword_item_ptr		pKeywordItem	= NULL;
+	keyword_item_ptr	pKeywordItem	= NULL;
+	KIRQL				oldIrql;
 
-	KeWaitForSingleObject(&g_keyword_Mutex, Executive, KernelMode, FALSE, NULL); 
+	KeAcquireSpinLock(&g_keyword_SpinLock, &oldIrql);
 	if(NULL != g_keyword_Index)
 	{
 		for(i = 0; i < MAX_INDEX; i++)
@@ -63,7 +64,7 @@ void keyword_Release()
 		ExFreePoolWithTag(g_keyword_Index, 'ehom');
 		g_keyword_Index = NULL;
 	}
-	KeReleaseMutex(&g_keyword_Mutex, FALSE);
+	KeReleaseSpinLock(&g_keyword_SpinLock, oldIrql);
 }
 
 /* 清除Keyword */
@@ -71,9 +72,10 @@ void keyword_Clear()
 {
 	int					i				= 0;
 	PLIST_ENTRY			pList			= NULL;
-	keyword_item_ptr		pKeywordItem	= NULL;
+	keyword_item_ptr	pKeywordItem	= NULL;
+	KIRQL				oldIrql;
 
-	KeWaitForSingleObject(&g_keyword_Mutex, Executive, KernelMode, FALSE, NULL); 
+	KeAcquireSpinLock(&g_keyword_SpinLock, &oldIrql);
 	if(NULL != g_keyword_Index)
 	{
 		for(i = 0; i < MAX_INDEX; i++)
@@ -90,15 +92,16 @@ void keyword_Clear()
 			g_keyword_Index[i].iskey = FALSE;
 		}
 	}
-	KeReleaseMutex(&g_keyword_Mutex, FALSE);
+	KeReleaseSpinLock(&g_keyword_SpinLock, oldIrql);
 }
 
 /* 添加一个KEY */
 void keyword_Add(char* pKeyword, ULONG nLen)
 {
-	keyword_item_ptr		pKeyItem	= NULL;
+	keyword_item_ptr	pKeyItem	= NULL;
 	PLIST_ENTRY			pList		= NULL;
 	int					i;
+	KIRQL				oldIrql;
 
 	if(NULL == pKeyword || 0 == nLen)
 		return;
@@ -113,7 +116,7 @@ void keyword_Add(char* pKeyword, ULONG nLen)
 	if(0 == nLen)
 		return;
 	// 开始添加
-	KeWaitForSingleObject(&g_keyword_Mutex, Executive, KernelMode, FALSE, NULL);
+	KeAcquireSpinLock(&g_keyword_SpinLock, &oldIrql);
 	if(NULL != g_keyword_Index)
 	{
 		UCHAR			uchar		= (UCHAR)pKeyword[0];
@@ -144,7 +147,7 @@ void keyword_Add(char* pKeyword, ULONG nLen)
 			}
 		}
 	}
-	KeReleaseMutex(&g_keyword_Mutex, FALSE);
+	KeReleaseSpinLock(&g_keyword_SpinLock, oldIrql);
 }
 
 /* 查找关键字 */
@@ -152,16 +155,10 @@ BOOLEAN keyword_Find(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT 
 {
 	int				i			= 0;
 	BOOLEAN			bFind		= FALSE;
-	KIRQL			oldIrql		= KeGetCurrentIrql();
+ 	KIRQL			oldIrql;
 
-	if(oldIrql > APC_LEVEL)
-		KeLowerIrql(APC_LEVEL);
-	// 等待函数必须运行在小于等于APC_LEVEL级
-	KeWaitForSingleObject(&g_keyword_Mutex, Executive, KernelMode, FALSE, NULL);
-	// 还原原来的IRQL级别
-	if(oldIrql > APC_LEVEL)
-		KeRaiseIrql(oldIrql, &oldIrql);
-	// 替换操作
+	KeAcquireSpinLock(&g_keyword_SpinLock, &oldIrql);
+	// 开始查找操作
 	for(i = 0; i < nLenData && FALSE == bFind; i++)
 	{
 		UCHAR				uchar		= (UCHAR)pData[i];
@@ -184,6 +181,6 @@ BOOLEAN keyword_Find(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT 
 			}
 		}
 	}
-	KeReleaseMutex(&g_keyword_Mutex, FALSE);
+	KeReleaseSpinLock(&g_keyword_SpinLock, oldIrql);
 	return bFind;
 }
