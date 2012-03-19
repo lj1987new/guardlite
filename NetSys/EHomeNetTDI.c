@@ -153,10 +153,9 @@ NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN
 		{
 			Irp->IoStatus.Information = 0;
 			Irp->IoStatus.Status = STATUS_INVALID_CONNECTION;
-			return STATUS_SUCCESS;
 		}
 	}
-
+	
 	if ( 0 != gEHomeFilterRule.rule && Irp->IoStatus.Status == STATUS_SUCCESS ) 
 	{
 		PVOID		pData			= MmGetSystemAddressForMdlSafe(Irp->MdlAddress, NormalPagePriority);
@@ -170,7 +169,6 @@ NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN
 				pSockContext->bStopOption = TRUE;
 			Irp->IoStatus.Information = 0;
 			Irp->IoStatus.Status = STATUS_INVALID_CONNECTION;
-			return STATUS_SUCCESS;
 		}
 	}
 	if(NULL == ctx)
