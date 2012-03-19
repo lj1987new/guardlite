@@ -152,8 +152,16 @@ BOOLEAN keyword_Find(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT 
 {
 	int				i			= 0;
 	BOOLEAN			bFind		= FALSE;
+	KIRQL			oldIrql		= KeGetCurrentIrql();
 
+	if(oldIrql > APC_LEVEL)
+		KeLowerIrql(APC_LEVEL);
+	// 等待函数必须运行在小于等于APC_LEVEL级
 	KeWaitForSingleObject(&g_keyword_Mutex, Executive, KernelMode, FALSE, NULL);
+	// 还原原来的IRQL级别
+	if(oldIrql > APC_LEVEL)
+		KeRaiseIrql(oldIrql, &oldIrql);
+	// 替换操作
 	for(i = 0; i < nLenData && FALSE == bFind; i++)
 	{
 		UCHAR				uchar		= (UCHAR)pData[i];
