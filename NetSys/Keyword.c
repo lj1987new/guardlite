@@ -174,6 +174,8 @@ BOOLEAN keyword_Find(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT 
 				; pList = pList->Blink)
 			{
 				pKeyItem = CONTAINING_RECORD(pList, keyword_item, list);
+				if( (i + (int)pKeyItem->nSize) > nLenData )
+					continue;
 				if(memcmp(pData+i, (char*)pKeyItem+sizeof(keyword_item), pKeyItem->nSize) == 0)
 				{
 					bFind = TRUE;
