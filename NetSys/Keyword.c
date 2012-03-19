@@ -158,29 +158,38 @@ BOOLEAN keyword_Find(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT 
  	KIRQL			oldIrql;
 
 	KeAcquireSpinLock(&g_keyword_SpinLock, &oldIrql);
-	// 开始查找操作
-	for(i = 0; i < nLenData && FALSE == bFind; i++)
+	__try
 	{
-		UCHAR				uchar		= (UCHAR)pData[i];
-		PLIST_ENTRY			pList;
-		keyword_item_ptr		pKeyItem;
-
-		if(FALSE == g_keyword_Index[uchar].iskey)
-			continue;	// 快束查找
-		for(pList = g_keyword_Index[uchar].list.Blink
-			; pList != &g_keyword_Index[uchar].list
-			; pList = pList->Blink)
+		// 开始查找操作
+		for(i = 0; i < nLenData && FALSE == bFind; i++)
 		{
-			pKeyItem = CONTAINING_RECORD(pList, keyword_item, list);
-			if(memcmp(pData+i, (char*)pKeyItem+sizeof(keyword_item), pKeyItem->nSize) == 0)
+			UCHAR				uchar		= (UCHAR)pData[i];
+			PLIST_ENTRY			pList;
+			keyword_item_ptr		pKeyItem;
+
+			if(FALSE == g_keyword_Index[uchar].iskey)
+				continue;	// 快束查找
+			for(pList = g_keyword_Index[uchar].list.Blink
+				; pList != &g_keyword_Index[uchar].list
+				; pList = pList->Blink)
 			{
-				bFind = TRUE;
-				*ppKeyWord = pData + i;
-				*pLenKeyWord = pKeyItem->nSize;
-				break;
+				pKeyItem = CONTAINING_RECORD(pList, keyword_item, list);
+				if(memcmp(pData+i, (char*)pKeyItem+sizeof(keyword_item), pKeyItem->nSize) == 0)
+				{
+					bFind = TRUE;
+					*ppKeyWord = pData + i;
+					*pLenKeyWord = pKeyItem->nSize;
+					break;
+				}
 			}
 		}
 	}
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		// 防止读取越界异常
+		bFind = FALSE;
+	}
+
 	KeReleaseSpinLock(&g_keyword_SpinLock, oldIrql);
 	return bFind;
 }
