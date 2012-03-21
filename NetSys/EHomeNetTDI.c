@@ -79,6 +79,11 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 	{
 		return STATUS_DATA_NOT_ACCEPTED;
 	}
+	// 分析HTTP协议的第一个返回包
+	if( !CheckIsTextHtmlData(Tsdu, BytesIndicated) )
+	{
+		pSocketContext->bIsHttp = FALSE;
+	}
 	// 替换关键字
 	if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
 	{
@@ -335,6 +340,55 @@ void EHomeFilterRecvData(IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue)
  		// 断开连接
 		*pbContinue = FALSE;
 	}
+}
+
+/* 分析第一个返回的包， 是不是text/html协议 */
+BOOLEAN CheckIsTextHtmlData(IN CHAR* pData, IN ULONG nLen)
+{
+	int					nFindLabel			= 0;
+	char*				pNextLine			= pData;
+	char*				pCRLF				= NULL;
+	char				szContentType[32]	= {0};
+	int					i;
+	int					nLastLen;
+
+	if( 0 != memcmp(pData, "HTTP/1", 6) )
+		return TRUE;
+
+	// 分析是否含有Content-Type信息
+	while(NULL != pNextLine && (pNextLine - pData) < (int)nLen)
+	{
+		if(_strnicmp(pNextLine, "Content-Type:", 13) == 0)
+		{
+			nFindLabel++;
+			pNextLine += 13;
+			nLastLen = nLen - (pNextLine - pData);
+			for(i = 0; i < (int)(sizeof(szContentType) - 1) && i < nLastLen; i++)
+			{
+				if( !pNextLine[i] || '\r' == pNextLine[i] || '\n' == pNextLine[i] )
+					break;
+				szContentType[i] = pNextLine[i];
+			}
+		}
+		if(1 == nFindLabel)
+			break;
+		// 转到下一行
+		pCRLF = strchr(pNextLine, '\r');
+		if(NULL == pCRLF)
+			pCRLF = strchr(pNextLine, '\n');
+		else
+			pCRLF++;
+		if(NULL != pCRLF && '\n' == *pCRLF)
+			pCRLF++;
+		pNextLine = pCRLF;
+	}
+	
+	if(0 == szContentType[0])
+		return TRUE;
+	_strlwr(szContentType);
+	if( NULL == strstr(szContentType, "text/html") )
+		return FALSE;
+	return TRUE;
 }
 
 /* 关闭连接 */

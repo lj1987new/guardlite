@@ -568,6 +568,8 @@ NTSTATUS Ehomedisp(PDEVICE_OBJECT pDevObj,PIRP irp)
 	IoSetCompletionRoutine(irp, DispatchRoutineComplate, NULL, TRUE, TRUE, TRUE);
 #endif
 	DevExt = (PDEVICE_EXTENTION)pDevObj->DeviceExtension;
+	if(DT_FILTER_TCP == DevExt->DeviceType && IRP_MJ_CREATE == stack->MajorFunction)
+		EHomeTcpOpen(irp, stack);
 	return IoCallDriver(DevExt->LowTcpDev, irp);
 }
 // IRP_MJ_DEVICE_CONTROL派遣函数
@@ -970,4 +972,26 @@ void		HttpRequestEraseFlag(char* pHttpRequest, int nHttpLen)
 		if(i >= (nHttpLen - 1))
 			break; // 找不到下一行
 	}
+}
+
+/*
+ *	打开TCP连接时, 记录下相关信息
+ */
+void EHomeTcpOpen(PIRP pIrp, PIO_STACK_LOCATION pIrps)
+{
+	PFILE_FULL_EA_INFORMATION		pFileEa			= NULL;
+	PFILE_OBJECT					pFileObj		= pIrps->FileObject;
+	tdi_foc_ptr						pConnect		= NULL;
+
+	pFileEa = (PFILE_FULL_EA_INFORMATION)pIrp->AssociatedIrp.SystemBuffer;
+	if(NULL == pFileEa)
+		return;
+	if( TDI_CONNECTION_CONTEXT_LENGTH != pFileEa->EaNameLength )
+		return;
+	if( 0 != memcmp(TdiConnectionContext, pFileEa->EaName, TDI_CONNECTION_CONTEXT_LENGTH) )
+		return;
+	pConnect = tdi_foc_GetConnection(pFileObj, TRUE);
+	if(NULL == pConnect)
+		return;
+	pConnect->connecation.pConnectContext = *( (CONNECTION_CONTEXT *)(pFileEa->EaName + (pFileEa->EaNameLength + 1)) );
 }

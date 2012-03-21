@@ -52,6 +52,7 @@ NTSTATUS	EhomeCreate(PDEVICE_OBJECT pDevObj,PIRP irp);
 NTSTATUS	EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp);
 NTSTATUS	EhomeCloseCleanup(PDEVICE_OBJECT pDevObj,PIRP irp);
 NTSTATUS	EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp);
+void		EHomeTcpOpen(PIRP pIrp, PIO_STACK_LOCATION pIrps);
 
 USHORT my_ntohs(USHORT uPort);
 ULONG my_ntohl(ULONG ip);
@@ -77,7 +78,8 @@ NTSTATUS	CheckUrl(char* pHttpPacket, int nHttpLen, tdi_foc_connection_ptr pAddre
 void		HttpRequestEraseFlag(char* pHttpRequest, int nHttpLen);
 
 // 处理关键字过滤
-void EHomeFilterRecvData(IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue);
+void		EHomeFilterRecvData(IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue);
+BOOLEAN		CheckIsTextHtmlData(IN CHAR* pData, IN ULONG nLen);
 NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN PVOID Context);
 
 extern EHOME_FILTER_RULE	gEHomeFilterRule;
