@@ -2,6 +2,7 @@
  *	TDI的TCP连接操作的HASH操作
  */
 #include <ntddk.h>
+#include <tdi.h>
 #include "TdiFileObjectContext.h"
 
 #define HASH_SIZE				0x1000

@@ -6,9 +6,10 @@
 /* 连接对像使用结构体 */
 typedef struct
 {
-	ULONG				IPAdd;
-	USHORT				Port;
-	BOOLEAN				bChecked;
+	ULONG					IPAdd;
+	USHORT					Port;
+	BOOLEAN					bChecked;
+	CONNECTION_CONTEXT		pConnectContext;
 } tdi_foc_connection, *tdi_foc_connection_ptr;
 
 /* 地址对像使作结构体 */
