@@ -92,6 +92,7 @@ typedef struct _CtrlNetwork{
 // 关键字过滤结构
 typedef struct _FilterKeywordBlock{
 	LONG		rule;					// >0: 替换, <0: 阻止, 0: 无效
+	LONG		bInline;				// 是否是内连， 不一定正确
 	ULONGLONG	pid;					// 进程ID
 	ULONG		nPort;					// 端口号
 	CHAR		szHost[128];			// 截获的HOST

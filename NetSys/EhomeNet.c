@@ -547,13 +547,16 @@ jmp1:
 		return STATUS_INVALID_CONNECTION;
 	}
 	// 允许时需要记录下HOST信息
-	if(NULL != gEHomeKeyword.noticeevent)
+	if(NULL != gEHomeKeyword.noticeevent && 0 != gEHomeFilterRule.rule)
 	{
 		pAddress->pHost = ExAllocatePoolWithTag(NonPagedPool, strlen(HostInfo.szUrl)+1, 'ehom');
 		if(NULL != pAddress->pHost)
 		{
 			RtlZeroMemory(pAddress->pHost, strlen(HostInfo.szUrl)+1);
 			strcpy(pAddress->pHost, HostInfo.szUrl);
+			pAddress->pid = (ULONGLONG)PsGetCurrentProcessId();
+			pAddress->bInline = (0 != HostInfo.bHasInline)?TRUE:FALSE;
+			KdPrint(("!!! EhomeNet.sys get connection url (%X)%s\n", pAddress->pHost, pAddress->pHost));
 		}
 	}
 
@@ -759,6 +762,10 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 				uOutSize = min(uOutSize, sizeof(FILTERKEYWORDBLOCK));
 				memcpy(buf, &pfkb->fkl, uOutSize);
 				ExFreeToNPagedLookasideList(&gEHomeKeyword.lookaside, pfkb);
+			}
+			if(FALSE == IsListEmpty(&gEHomeKeyword.headlist))
+			{
+				KeSetEvent(gEHomeKeyword.noticeevent, 0, TRUE);
 			}
 		}
 		break;

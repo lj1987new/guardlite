@@ -354,12 +354,14 @@ void EHomeFilterRecvData(IN tdi_foc_ptr pAddressContext, IN PVOID pData, IN ULON
 				return;
 			RtlZeroMemory(pfkb, sizeof(FILTER_KEYWORD_BLOCK));
 			pfkb->fkl.nPort = pConnect->connecation.Port;
-			pfkb->fkl.pid = (ULONGLONG)PsGetCurrentProcessId();
+			pfkb->fkl.pid = pConnect->connecation.pid;
 			pfkb->fkl.rule = gEHomeFilterRule.rule;
+			pfkb->fkl.bInline = pConnect->connecation.bInline;
 			if(NULL != pConnect->connecation.pHost)
 			{
 				strncpy(pfkb->fkl.szHost, pConnect->connecation.pHost
 					, min(strlen(pConnect->connecation.pHost), 128));
+				KdPrint(("!!! EhomeNet.sys find keyword (%X)%s\n", pConnect->connecation.pHost, pConnect->connecation.pHost));
 			}
 			ExInterlockedInsertTailList(&gEHomeKeyword.headlist, &pfkb->list, &gEHomeKeyword.spinlock);
 			KeSetEvent(gEHomeKeyword.noticeevent, 0, TRUE);
