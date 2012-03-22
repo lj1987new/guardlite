@@ -389,7 +389,7 @@ BOOLEAN CheckIsTextHtmlData(IN CHAR* pData, IN ULONG nLen)
 		{
 			nFindLabel++;
 			pNextLine += 13;
-			nLastLen = nLen - (pNextLine - pData);
+			nLastLen = nLen - (ULONG)(pNextLine - pData);
 			for(i = 0; i < (int)(sizeof(szContentType) - 1) && i < nLastLen; i++)
 			{
 				if( !pNextLine[i] || '\r' == pNextLine[i] || '\n' == pNextLine[i] )
