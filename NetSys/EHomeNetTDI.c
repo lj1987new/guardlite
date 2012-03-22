@@ -7,15 +7,17 @@
 #include "Keyword.h"
 #include "TdiFileObjectContext.h"
 
-NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEXT  ConnectionContext
+void		EHomeFilterRecvData(IN tdi_foc_ptr pAddressContext, IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue);
+BOOLEAN		CheckIsTextHtmlData(IN CHAR* pData, IN ULONG nLen);
+NTSTATUS	EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEXT  ConnectionContext
 								 , IN ULONG  ReceiveFlags, IN ULONG  BytesIndicated, IN ULONG  BytesAvailable
 								 , OUT ULONG  *BytesTaken, IN PVOID  Tsdu, OUT PIRP  *IoRequestPacket);
-NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEXT  ConnectionContext
+NTSTATUS	EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEXT  ConnectionContext
 								 , IN ULONG  ReceiveFlags, IN ULONG  ReceiveLength, IN ULONG  StartingOffset
 								 , IN PMDL  Tsdu, IN PVOID  TsduDescriptor);
 
-void EHomeReplaceKeyword(IN PVOID pData, IN ULONG nLen);
-NTSTATUS tdi_close_connect(PFILE_OBJECT pFileObject);
+void		EHomeReplaceKeyword(IN PVOID pData, IN ULONG nLen);
+NTSTATUS	tdi_close_connect(PFILE_OBJECT pFileObject);
 
 // 设置事件句柄
 NTSTATUS		EHomeTDISetEventHandler(PIRP pIrp, PIO_STACK_LOCATION pStack)
@@ -87,7 +89,7 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 	// 替换关键字
 	if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
 	{
-		EHomeFilterRecvData( Tsdu, BytesIndicated, &bContinue );
+		EHomeFilterRecvData( pSocketContext, Tsdu, BytesIndicated, &bContinue );
 		if( FALSE == bContinue )
 		{
 			pSocketContext->bStopOption = TRUE;
@@ -167,7 +169,7 @@ NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN
 		BOOLEAN		bContinue		= TRUE;	
 		
 		KdPrint(("[tdi_client_irp_complete] len:%d, data: %s\n", Irp->IoStatus.Information, pData));
-		EHomeFilterRecvData(pData, (ULONG)Irp->IoStatus.Information, &bContinue);
+		EHomeFilterRecvData( pSockContext, pData, (ULONG)Irp->IoStatus.Information, &bContinue);
 		if(FALSE == bContinue)
 		{
 			if( NULL != pSockContext )
@@ -250,7 +252,7 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 	}
 	else if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
 	{
-		EHomeFilterRecvData((char *)pData + StartingOffset, ReceiveLength, &bContinue);
+		EHomeFilterRecvData(pSocketContext, (char *)pData + StartingOffset, ReceiveLength, &bContinue);
 		if( FALSE == bContinue )
 		{
 			pSocketContext->bStopOption = TRUE;
@@ -321,7 +323,7 @@ NTSTATUS TdiCall (IN PIRP pIrp, IN PDEVICE_OBJECT pDeviceObject, IN OUT PIO_STAT
 }
 
 /*过滤关键字*/
-void EHomeFilterRecvData(IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue)
+void EHomeFilterRecvData(IN tdi_foc_ptr pAddressContext, IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue)
 {
 	*pbContinue = TRUE;
 	if(gEHomeFilterRule.rule > 0)
@@ -339,6 +341,29 @@ void EHomeFilterRecvData(IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue)
 			return;
  		// 断开连接
 		*pbContinue = FALSE;
+		// 添加断开连接记录
+		if( NULL != gEHomeKeyword.noticeevent )
+		{
+			PFILTER_KEYWORD_BLOCK	pfkb				= NULL;
+			tdi_foc_ptr				pConnect			= tdi_foc_GetConnection(pAddressContext->pConnectFileObj, FALSE);
+
+			if(NULL == pConnect)
+				return;
+			pfkb = ExAllocateFromNPagedLookasideList(&gEHomeKeyword.lookaside);
+			if(NULL == pfkb)
+				return;
+			RtlZeroMemory(pfkb, sizeof(FILTER_KEYWORD_BLOCK));
+			pfkb->fkl.nPort = pConnect->connecation.Port;
+			pfkb->fkl.pid = (ULONGLONG)PsGetCurrentProcessId();
+			pfkb->fkl.rule = gEHomeFilterRule.rule;
+			if(NULL != pConnect->connecation.pHost)
+			{
+				strncpy(pfkb->fkl.szHost, pConnect->connecation.pHost
+					, min(strlen(pConnect->connecation.pHost), 128));
+			}
+			ExInterlockedInsertTailList(&gEHomeKeyword.headlist, &pfkb->list, &gEHomeKeyword.spinlock);
+			KeSetEvent(gEHomeKeyword.noticeevent, 0, TRUE);
+		}
 	}
 }
 

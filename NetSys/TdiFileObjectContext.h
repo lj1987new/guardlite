@@ -10,6 +10,7 @@ typedef struct
 	USHORT					Port;
 	BOOLEAN					bChecked;
 	CONNECTION_CONTEXT		pConnectContext;
+	CHAR*					pHost;
 } tdi_foc_connection, *tdi_foc_connection_ptr;
 
 /* 地址对像使作结构体 */

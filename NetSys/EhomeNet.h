@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ntddk.h>
+#include "EhomeDevCtl.h"
 #include "tdi.h"
 #include "TdiKrnl.h"
 #include "TdiFileObjectContext.h"
@@ -46,6 +47,17 @@ typedef struct _tdi_client_irp_ctx {
 	PFILE_OBJECT            addrobj;
 }tdi_client_irp_ctx;
 
+typedef struct _filter_keyword_block{
+	LIST_ENTRY				list;
+	FILTERKEYWORDBLOCK		fkl;
+} FILTER_KEYWORD_BLOCK, *PFILTER_KEYWORD_BLOCK;
+
+typedef struct _ehome_filter_keyword{
+	LIST_ENTRY				headlist;
+	NPAGED_LOOKASIDE_LIST	lookaside;
+	KSPIN_LOCK				spinlock;
+	PKEVENT					noticeevent;
+} EHOME_FILTER_KEYWORD;
 
 NTSTATUS	Ehomedisp(PDEVICE_OBJECT pDevObj,PIRP irp);
 NTSTATUS	EhomeCreate(PDEVICE_OBJECT pDevObj,PIRP irp);
@@ -78,8 +90,7 @@ NTSTATUS	CheckUrl(char* pHttpPacket, int nHttpLen, tdi_foc_connection_ptr pAddre
 void		HttpRequestEraseFlag(char* pHttpRequest, int nHttpLen);
 
 // 处理关键字过滤
-void		EHomeFilterRecvData(IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue);
-BOOLEAN		CheckIsTextHtmlData(IN CHAR* pData, IN ULONG nLen);
 NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN PVOID Context);
 
-extern EHOME_FILTER_RULE	gEHomeFilterRule;
+extern EHOME_FILTER_RULE		gEHomeFilterRule;
+extern EHOME_FILTER_KEYWORD		gEHomeKeyword;

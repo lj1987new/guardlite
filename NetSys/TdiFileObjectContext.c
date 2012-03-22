@@ -138,8 +138,8 @@ tdi_foc_ptr tdi_foc_GetConnection(PFILE_OBJECT pConnectFileObj, BOOLEAN bCreate)
 void				tdi_foc_Erase(PFILE_OBJECT pAddressFileObj)
 {
 	int						nIndex		= CALC_HASH(pAddressFileObj);
-	tdi_foc_ptr		pRet		= NULL;
-	tdi_foc_ptr		pTemp		= NULL;
+	tdi_foc_ptr				pRet		= NULL;
+	tdi_foc_ptr				pTemp		= NULL;
 	KIRQL					irql;
 	PLIST_ENTRY				pList		= NULL;
 
@@ -156,6 +156,11 @@ void				tdi_foc_Erase(PFILE_OBJECT pAddressFileObj)
 		{
 			pList->Flink->Blink = pList->Blink;
 			pList->Blink->Flink = pList->Flink;
+			if(FALSE == pTemp->bIsAddressFileObj && NULL != pTemp->connecation.pHost)
+			{
+				ExFreePoolWithTag(pTemp->connecation.pHost, 'ehom');
+				pTemp->connecation.pHost = NULL;
+			}
 			ExFreeToNPagedLookasideList(&g_tdi_foc_HashLookaside, pTemp);
 			KdPrint(("[tdi_foc_Erase] delete %x from %d\n", pAddressFileObj, nIndex));
 			break;

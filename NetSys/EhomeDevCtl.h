@@ -57,6 +57,20 @@
 #define IOCTL_CONTROL_FILTER_CLEARKEYWORD	CTL_CODE(FILE_DEVICE_UNKNOWN,\
 		0x0807, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
+/*
+ *	设置关键字断网提示事件
+ *  传入数据: (HANDEL) 外部事件句柄
+ */
+#define IOCTL_CONTROL_FILTER_SETEVENT		CTL_CODE(FILE_DEVICE_UNKNOWN,\
+		0x0808, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
+/*
+ *	获取一个断网提示关键字
+ *  传出参数: Filter_block结构
+ */
+#define IOCTL_CONTROL_FILTER_GET_BLOCK		CTL_CODE(FILE_DEVICE_UNKNOWN,\
+		0x0809, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
 //////////////////////////////////////////////////////////////////////////
 #define NAMELENGTH     128
 #pragma pack(push, 1)
@@ -74,5 +88,13 @@ typedef struct _CtrlNetwork{
 	LONG		code;					// 0: 断开网络, 1: 连接网络, -1: 查询状态
 	CHAR		szPaseProc[1];			// 跳过监控进程名字列表, 格式"|proc1.exe|proc2.exe|...\0"最大长度1020
 } CTRLNETWORK;
+
+// 关键字过滤结构
+typedef struct _FilterKeywordBlock{
+	LONG		rule;					// >0: 替换, <0: 阻止, 0: 无效
+	ULONGLONG	pid;					// 进程ID
+	ULONG		nPort;					// 端口号
+	CHAR		szHost[128];			// 截获的HOST
+} FILTERKEYWORDBLOCK;
 #pragma pack(pop)
 
