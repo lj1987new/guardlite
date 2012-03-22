@@ -241,15 +241,14 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 			httpPacket = (char*)MmGetSystemAddressForMdlSafe(irp->MdlAddress, NormalPagePriority);
 			if(FALSE == pAddress->bChecked)
 			{
-				// 互斥等待
-				__try{
-					// 有一台机子， 莫名其秒在此出现错误，原因为未查明
-					KeWaitForSingleObject(UrlNameMutex, Executive, KernelMode, FALSE, NULL); 
-				} 
-				__except (EXCEPTION_EXECUTE_HANDLER)
+				if(KeGetCurrentIrql() >= DISPATCH_LEVEL)
 				{
-					goto skipirp;
+					KdPrint(("[EhomeInternalDevCtl] TDI_SEND IRQL: %d\n", KeGetCurrentIrql()
+						)); 
+					goto skipirp; // 大于APC级别就不处理了退出
 				}
+				// 互斥等待
+				KeWaitForSingleObject(UrlNameMutex, Executive, KernelMode, FALSE, NULL); 
 				// 只过滤GET请求
 				status = CheckUrl(httpPacket, reqSend->SendLength, pAddress, &bIsHttp);
 				KeReleaseMutex(UrlNameMutex, FALSE);
@@ -530,7 +529,7 @@ NTSTATUS CheckUrl(char* pHttpPacket, int nHttpLen, tdi_foc_connection_ptr pAddre
 	// 等待用户确认
 	timeout.QuadPart = -10 * 1000 * 2000;
 	status = KeWaitForSingleObject(UrlAllowOrNotEvent, Executive, KernelMode, FALSE, &timeout);
-	if(status==STATUS_TIMEOUT)
+	if(STATUS_TIMEOUT == status)
 	{
 		// DbgPrint("timeout status:%x",KeWaitForSingleObject(UrlAllowOrNotEvent,Executive,KernelMode,FALSE,&ttimeout));
 		KeSetEvent(UrlAllowOrNotEvent, 0, FALSE);
