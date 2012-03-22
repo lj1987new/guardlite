@@ -24,6 +24,7 @@ PDEVICE_OBJECT				EhomeCtlDev					= NULL;
 PKEVENT						UrlAllowOrNotEvent			= NULL;
 PKMUTEX						UrlNameMutex				= NULL;
 EHOME_FILTER_RULE			gEHomeFilterRule			= {0};
+EHOME_FILTER_KEYWORD		gEHomeKeyword				= {0};
 // NPAGED_LOOKASIDE_LIST		gPagedLookaside				= {0};
 // PNPAGED_LOOKASIDE_LIST		NpagedLookaside				= &gPagedLookaside;
 // 一个新的TCP请求到来时会存储在EHOME_LIST结构的链表中
@@ -149,6 +150,11 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 	DevExt->DeviceType = DT_EHOME;
 	//KdPrint(("leave Ehome DriverEntry\n"));	
 	gEhomeClear = 3L;
+	// 初始化信息
+	InitializeListHead(&gEHomeKeyword.headlist);
+	KeInitializeSpinLock(&gEHomeKeyword.spinlock);
+	ExInitializeNPagedLookasideList(&gEHomeKeyword.lookaside, NULL, NULL, 0, sizeof(FILTER_KEYWORD_BLOCK), 'ehom', 0);
+	gEHomeKeyword.noticeevent = NULL;
 	goto end;
 failed:
 	// 失败后清除分配的内存
@@ -540,7 +546,17 @@ jmp1:
 	{
 		return STATUS_INVALID_CONNECTION;
 	}
-	
+	// 允许时需要记录下HOST信息
+	if(NULL != gEHomeKeyword.noticeevent)
+	{
+		pAddress->pHost = ExAllocatePoolWithTag(NonPagedPool, strlen(HostInfo.szUrl)+1, 'ehom');
+		if(NULL != pAddress->pHost)
+		{
+			RtlZeroMemory(pAddress->pHost, strlen(HostInfo.szUrl)+1);
+			strcpy(pAddress->pHost, HostInfo.szUrl);
+		}
+	}
+
 	return STATUS_SUCCESS;
 }
 // 默认派遣函数
@@ -637,25 +653,24 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 				IsHttpFilterOn = FALSE;
 				//KdPrint(("GetEvent failed  %x  EventHandl:%x\n",status,EventHandle));
 			}
-			break;
 		}
+		break;
 	case IOCTL_GET_DNS_INFO:
 		{
 			//KdPrint(("Http get info\n"));
 			uOutSize = min(uOutSize, sizeof(HostInfo));
 			memcpy(buf, &HostInfo, uOutSize);
 			status = STATUS_SUCCESS;
-			break;
 		}
+		break;
 	case IOCTL_DNS_ALLOW_OR_NOT:
 		{
 			//KdPrint(("Http allowornot\n"));
 			IsHttpAllow= *((ULONG*)buf);
 			KeSetEvent(UrlAllowOrNotEvent, 0, FALSE);
 			status = STATUS_SUCCESS;
-			break;
-
 		}
+		break;
 	case IOCTL_CONTROL_NETWORK:
 		{
 			CTRLNETWORK*	pCtrl		= ((CTRLNETWORK *)buf);
@@ -685,15 +700,15 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 				uOutSize = 0;
 			}
 			status = STATUS_SUCCESS;
-			break;
 		}
+		break;
 	case IOCTL_CONTROL_CLEARCACHE:
 		{
 			memset(&storageurl, 0, sizeof(storageurl));
 			status = STATUS_SUCCESS;
 			uOutSize = 0;
-			break;
 		}
+		break;
 	case IOCTL_CONTROL_FILTER_RULE:
 		{
 			if(uInSize >= 4)
@@ -713,6 +728,38 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 	case IOCTL_CONTROL_FILTER_CLEARKEYWORD:
 		{
 			keyword_Clear();
+		}
+		break;
+	case IOCTL_CONTROL_FILTER_SETEVENT:
+		{
+			ULONGLONG		EventHandle			= 0;
+
+			if(8 == uInSize)
+				EventHandle = *((PULONGLONG)buf);
+			else
+				EventHandle = (ULONGLONG)*((PULONG)buf);
+
+			status = ObReferenceObjectByHandle((PVOID)EventHandle, SYNCHRONIZE, *ExEventObjectType
+				, irp->RequestorMode, (PVOID*)&gEHomeKeyword.noticeevent, NULL);
+			if( !NT_SUCCESS(status) )
+			{
+				gEHomeKeyword.noticeevent = NULL;
+			}
+		}
+		break;
+	case IOCTL_CONTROL_FILTER_GET_BLOCK:
+		{
+			PFILTER_KEYWORD_BLOCK		pfkb		= NULL;
+			PLIST_ENTRY					plist		= NULL;
+
+			plist = ExInterlockedRemoveHeadList(&gEHomeKeyword.headlist, &gEHomeKeyword.spinlock);
+			if(NULL != plist)
+			{
+				pfkb = CONTAINING_RECORD(plist, FILTER_KEYWORD_BLOCK, list);
+				uOutSize = min(uOutSize, sizeof(FILTERKEYWORDBLOCK));
+				memcpy(buf, &pfkb->fkl, uOutSize);
+				ExFreeToNPagedLookasideList(&gEHomeKeyword.lookaside, pfkb);
+			}
 		}
 		break;
 	}
@@ -755,6 +802,20 @@ NTSTATUS EhomeCloseCleanup(PDEVICE_OBJECT pDevObj,PIRP irp)
 	IsHttpAllow = TRUE;
 	gControlPID = NULL;
 	gEHomeFilterRule.rule = 0; // 停止监控
+	
+	gEHomeKeyword.noticeevent = NULL;
+	while(TRUE)
+	{
+		PFILTER_KEYWORD_BLOCK		pfkb		= NULL;
+		PLIST_ENTRY					plist		= NULL;
+
+		plist = ExInterlockedRemoveHeadList(&gEHomeKeyword.headlist, &gEHomeKeyword.spinlock);
+		if(NULL == plist)
+			break;
+		pfkb = CONTAINING_RECORD(plist, FILTER_KEYWORD_BLOCK, list);
+		ExFreeToNPagedLookasideList(&gEHomeKeyword.lookaside, pfkb);
+	}
+
 	irp->IoStatus.Status= STATUS_SUCCESS;
 	irp->IoStatus.Information = 0;
 	IoCompleteRequest(irp,IO_NO_INCREMENT);
