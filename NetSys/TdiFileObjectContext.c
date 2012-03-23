@@ -94,7 +94,7 @@ tdi_foc_ptr tdi_foc_GetAddress(PFILE_OBJECT pAddressFileObj, BOOLEAN bCreate)
 		pSocketContext->pAddressFileObj = pAddressFileObj;
 		pSocketContext->bIsAddressFileObj = TRUE;
 		ExInterlockedInsertHeadList(&g_tdi_foc_HashTable[nIndex], &pSocketContext->list, &g_tdi_foc_HashSpinLock);
-		KdPrint(("[tdi_foc_GetConnection] insert %x to %d\n", pAddressFileObj, nIndex));
+		//KdPrint(("[tdi_foc_GetConnection] insert %x to %d\n", pAddressFileObj, nIndex));
 	}
 	else if(NULL != pSocketContext)
 	{
@@ -123,7 +123,7 @@ tdi_foc_ptr tdi_foc_GetConnection(PFILE_OBJECT pConnectFileObj, BOOLEAN bCreate)
 		RtlZeroMemory(pSocketContext, sizeof(tdi_foc));
 		pSocketContext->pAddressFileObj = pConnectFileObj;
 		ExInterlockedInsertHeadList(&g_tdi_foc_HashTable[nIndex], &pSocketContext->list, &g_tdi_foc_HashSpinLock);
-		KdPrint(("[tdi_foc_GetConnection] insert %x to %d\n", pConnectFileObj, nIndex));
+		//KdPrint(("[tdi_foc_GetConnection] insert %x to %d\n", pConnectFileObj, nIndex));
 	}
 	else if(NULL != pSocketContext)
 	{
@@ -162,7 +162,7 @@ void				tdi_foc_Erase(PFILE_OBJECT pAddressFileObj)
 				pTemp->connecation.pHost = NULL;
 			}
 			ExFreeToNPagedLookasideList(&g_tdi_foc_HashLookaside, pTemp);
-			KdPrint(("[tdi_foc_Erase] delete %x from %d\n", pAddressFileObj, nIndex));
+			//KdPrint(("[tdi_foc_Erase] delete %x from %d\n", pAddressFileObj, nIndex));
 			break;
 		}
 	}

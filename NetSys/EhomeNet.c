@@ -754,6 +754,7 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 		{
 			PFILTER_KEYWORD_BLOCK		pfkb		= NULL;
 			PLIST_ENTRY					plist		= NULL;
+			KIRQL						oldIrql;
 
 			plist = ExInterlockedRemoveHeadList(&gEHomeKeyword.headlist, &gEHomeKeyword.spinlock);
 			if(NULL != plist)
@@ -763,10 +764,13 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 				memcpy(buf, &pfkb->fkl, uOutSize);
 				ExFreeToNPagedLookasideList(&gEHomeKeyword.lookaside, pfkb);
 			}
+			// 判断是否还有数据未处理完
+			KeAcquireSpinLock(&gEHomeKeyword.spinlock, &oldIrql);
 			if(FALSE == IsListEmpty(&gEHomeKeyword.headlist))
 			{
 				KeSetEvent(gEHomeKeyword.noticeevent, 0, TRUE);
 			}
+			KeReleaseSpinLock(&gEHomeKeyword.spinlock, oldIrql);
 		}
 		break;
 	}
