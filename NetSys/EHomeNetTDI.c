@@ -8,7 +8,7 @@
 #include "TdiFileObjectContext.h"
 
 void		EHomeFilterRecvData(IN tdi_foc_ptr pAddressContext, IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue);
-BOOLEAN		CheckIsTextHtmlData(IN CHAR* pData, IN ULONG nLen);
+BOOLEAN		CheckIsTextHtmlData(IN CHAR* pData, IN ULONG nLen, IN BOOLEAN* pIsHttp);
 NTSTATUS	EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEXT  ConnectionContext
 								 , IN ULONG  ReceiveFlags, IN ULONG  BytesIndicated, IN ULONG  BytesAvailable
 								 , OUT ULONG  *BytesTaken, IN PVOID  Tsdu, OUT PIRP  *IoRequestPacket);
@@ -241,10 +241,9 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 		//KdPrint(("[EHomeClientEventChainedReceive] len:%d, data: %s\n", ReceiveLength, (char *)pData + StartingOffset));
 	}
 	// 分析HTTP协议的第一个返回包
-	if( NULL != pData && !CheckIsTextHtmlData((char *)pData + StartingOffset, ReceiveLength) )
+	if( NULL != pData && !CheckIsTextHtmlData((char *)pData + StartingOffset, ReceiveLength, &pSocketContext->bIsHttp) )
 	{
 		pSocketContext->bIsHttp = FALSE;
-		KdPrint(("[EHomeClientEventChainedReceive] skip keyword filter\n"));
 	}
 	// 如果是取消息的就停止接收
 	if( FALSE != pSocketContext->bStopOption )
@@ -361,17 +360,16 @@ void EHomeFilterRecvData(IN tdi_foc_ptr pAddressContext, IN PVOID pData, IN ULON
 			if(NULL != pConnect->connecation.pHost)
 			{
 				strncpy(pfkb->fkl.szHost, pConnect->connecation.pHost
-					, min(strlen(pConnect->connecation.pHost), 128));
-				KdPrint(("!!! EhomeNet.sys find keyword (%X)%s\n", pConnect->connecation.pHost, pConnect->connecation.pHost));
+					, min(strlen(pConnect->connecation.pHost), 127));
 			}
 			ExInterlockedInsertTailList(&gEHomeKeyword.headlist, &pfkb->list, &gEHomeKeyword.spinlock);
-			KeSetEvent(gEHomeKeyword.noticeevent, 0, TRUE);
+			KeSetEvent(gEHomeKeyword.noticeevent, 0, FALSE);
 		}
 	}
 }
 
 /* 分析第一个返回的包， 是不是text/html协议 */
-BOOLEAN CheckIsTextHtmlData(IN CHAR* pData, IN ULONG nLen)
+BOOLEAN CheckIsTextHtmlData(IN CHAR* pData, IN ULONG nLen, IN BOOLEAN* pIsHttp)
 {
 	int					nFindLabel			= 0;
 	char*				pNextLine			= pData;
@@ -415,7 +413,14 @@ BOOLEAN CheckIsTextHtmlData(IN CHAR* pData, IN ULONG nLen)
 		return TRUE;
 	_strlwr(szContentType);
 	if( NULL == strstr(szContentType, "text/html") )
+	{
+		KdPrint(("[CheckIsTextHtmlData] Content-Type: %s\n", szContentType));
 		return FALSE;
+	}
+	if(NULL != pIsHttp)
+	{
+		*pIsHttp = TRUE; // 防止连接重用
+	}
 	return TRUE;
 }
 

@@ -764,11 +764,15 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 				memcpy(buf, &pfkb->fkl, uOutSize);
 				ExFreeToNPagedLookasideList(&gEHomeKeyword.lookaside, pfkb);
 			}
+			else
+			{
+				uOutSize = 0;
+			}
 			// 判断是否还有数据未处理完
 			KeAcquireSpinLock(&gEHomeKeyword.spinlock, &oldIrql);
 			if(FALSE == IsListEmpty(&gEHomeKeyword.headlist))
 			{
-				KeSetEvent(gEHomeKeyword.noticeevent, 0, TRUE);
+				KeSetEvent(gEHomeKeyword.noticeevent, 0, FALSE);
 			}
 			KeReleaseSpinLock(&gEHomeKeyword.spinlock, oldIrql);
 		}
@@ -855,7 +859,7 @@ NTSTATUS EhomeConnectComRoutine(
     IN PVOID  Context
     )
 {
-	KIRQL					oldIrql;
+// 	KIRQL					oldIrql;
 	PIO_STACK_LOCATION		stack			= IoGetCurrentIrpStackLocation(irp);
 	tdi_foc_ptr		pSockConnect	= NULL;
 	TA_ADDRESS *			remote_addr;
