@@ -42,7 +42,7 @@ NTSTATUS		EHomeTDISetEventHandler(PIRP pIrp, PIO_STACK_LOCATION pStack)
 			pTdiEvent->EventHandler = EHomeClientEventReceive;
 			pTdiEvent->EventContext = pStack->FileObject;
 		}
-		KdPrint(("[EHomeTDISetEventHandler] TDI_EVENT_RECEIVE pTdiEvent->EventHandler: %d\n", pTdiEvent->EventHandler));
+		//KdPrint(("[EHomeTDISetEventHandler] TDI_EVENT_RECEIVE pTdiEvent->EventHandler: %d\n", pTdiEvent->EventHandler));
 	}
 	else if(TDI_EVENT_CHAINED_RECEIVE == pTdiEvent->EventType)
 	{
@@ -53,7 +53,7 @@ NTSTATUS		EHomeTDISetEventHandler(PIRP pIrp, PIO_STACK_LOCATION pStack)
 			pTdiEvent->EventHandler = EHomeClientEventChainedReceive;
 			pTdiEvent->EventContext = pStack->FileObject;
  		}
-		KdPrint(("[EHomeTDISetEventHandler] TDI_EVENT_CHAINED_RECEIVE pTdiEvent->EventHandler: %d\n", pTdiEvent->EventHandler));
+		//KdPrint(("[EHomeTDISetEventHandler] TDI_EVENT_CHAINED_RECEIVE pTdiEvent->EventHandler: %d\n", pTdiEvent->EventHandler));
 	}
 
 	return STATUS_SUCCESS;
@@ -69,7 +69,7 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 	char*									pData				= NULL;
 	BOOLEAN									bContinue			= TRUE;
 
-	KdPrint(("[EHomeClientEventReceive] len:%d, data: %s\n", BytesIndicated, Tsdu));
+	//KdPrint(("[EHomeClientEventReceive] len:%d, data: %s\n", BytesIndicated, Tsdu));
 	pSocketContext = tdi_foc_GetAddress((PFILE_OBJECT)TdiEventContext, FALSE);
 	if(NULL == pSocketContext || NULL == pSocketContext->address.event_receive_handler)
 	{
@@ -80,11 +80,6 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 	if( FALSE != pSocketContext->bStopOption )
 	{
 		return STATUS_DATA_NOT_ACCEPTED;
-	}
-	// 分析HTTP协议的第一个返回包
-	if( !CheckIsTextHtmlData(Tsdu, BytesIndicated) )
-	{
-		pSocketContext->bIsHttp = FALSE;
 	}
 	// 替换关键字
 	if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
@@ -163,12 +158,13 @@ NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN
 		}
 	}
 	
-	if ( 0 != gEHomeFilterRule.rule && Irp->IoStatus.Status == STATUS_SUCCESS ) 
+	if ( 0 != gEHomeFilterRule.rule && Irp->IoStatus.Status == STATUS_SUCCESS 
+		&& NULL != pSockContext && pSockContext->bIsHttp ) 
 	{
 		PVOID		pData			= MmGetSystemAddressForMdlSafe(Irp->MdlAddress, NormalPagePriority);
 		BOOLEAN		bContinue		= TRUE;	
 		
-		KdPrint(("[tdi_client_irp_complete] len:%d, data: %s\n", Irp->IoStatus.Information, pData));
+		//KdPrint(("[tdi_client_irp_complete] len:%d, data: %s\n", Irp->IoStatus.Information, pData));
 		EHomeFilterRecvData( pSockContext, pData, (ULONG)Irp->IoStatus.Information, &bContinue);
 		if(FALSE == bContinue)
 		{
@@ -242,9 +238,14 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 	if(NULL != Tsdu)
 	{
 		pData = (char *)MmGetSystemAddressForMdlSafe(Tsdu, NormalPagePriority);
-		KdPrint(("[EHomeClientEventChainedReceive] %s \n", pData));
+		//KdPrint(("[EHomeClientEventChainedReceive] len:%d, data: %s\n", ReceiveLength, (char *)pData + StartingOffset));
 	}
-	KdPrint(("[EHomeClientEventChainedReceive] len:%d, data: %s\n", ReceiveLength, (char *)pData + StartingOffset));
+	// 分析HTTP协议的第一个返回包
+	if( NULL != pData && !CheckIsTextHtmlData((char *)pData + StartingOffset, ReceiveLength) )
+	{
+		pSocketContext->bIsHttp = FALSE;
+		KdPrint(("[EHomeClientEventChainedReceive] skip keyword filter\n"));
+	}
 	// 如果是取消息的就停止接收
 	if( FALSE != pSocketContext->bStopOption )
 	{
