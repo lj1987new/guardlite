@@ -176,7 +176,7 @@ void				tdi_foc_Erase(PFILE_OBJECT pAddressFileObj)
 void		tdi_foc_Release()
 {
 	int						i;
-	tdi_foc_ptr		pTemp		= NULL;
+	tdi_foc_ptr				pTemp		= NULL;
 	KIRQL					irql;
 
 	if(NULL == g_tdi_foc_HashTable)
