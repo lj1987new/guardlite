@@ -88,7 +88,6 @@ NTSTATUS	DispatchRoutineComplate(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN
 NTSTATUS	CheckNetwork(PIO_STACK_LOCATION pStack, PDEVICE_EXTENTION pDevExt, char* pProcName);	
 NTSTATUS	CheckUrl(char* pHttpPacket, int nHttpLen, tdi_foc_connection_ptr pAddress, BOOLEAN* pIsHttp);
 void		HttpRequestEraseFlag(char* pHttpRequest, int nHttpLen);
-NTSTATUS	DoNetRedirect(tdi_foc_ptr pfocConnect, char* pHeader);
 
 // 处理关键字过滤
 NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN PVOID Context);
