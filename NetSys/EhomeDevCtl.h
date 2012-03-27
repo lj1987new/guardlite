@@ -77,6 +77,14 @@
  */
 #define IOCTL_DNS_REDIRECT					CTL_CODE(FILE_DEVICE_UNKNOWN,\
 		0x0810, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
+/*
+ *	设置断网通知事件
+ *  传入数据: (HANDEL) 外部事件句柄
+ */
+#define IOCTL_CONTROL_NETWORK_SETEVENT		CTL_CODE(FILE_DEVICE_UNKNOWN,\
+		0x0811, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
 //////////////////////////////////////////////////////////////////////////
 #define NAMELENGTH     128
 #pragma pack(push, 1)

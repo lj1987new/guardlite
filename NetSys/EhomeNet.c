@@ -20,6 +20,7 @@ URLINFO						HostInfo					= {0};
 ULONG						IsHttpAllow					= 1;
 ULONG						IsHttpFilterOn				= 0;
 PKEVENT						EhomeUsrEvent				= NULL;
+PKEVENT						gEHomeNewworkEvent			= NULL;
 PDEVICE_OBJECT				EhomeCtlDev					= NULL;
 PKEVENT						UrlAllowOrNotEvent			= NULL;
 PKMUTEX						UrlNameMutex				= NULL;
@@ -216,6 +217,11 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 		status = CheckNetwork(stack, DevExt, (char *)epro + NamePos);
 		if(NT_SUCCESS(status))
 			goto skipirp;
+		// 设置通知事件
+		if(TDI_CONNECT == stack->MinorFunction && NULL != gEHomeNewworkEvent)
+		{
+			KeSetEvent(gEHomeNewworkEvent, 0, TRUE);
+		}
 		goto stopirp;	// 停止IRP
 	}
 	if(1 == irp->CurrentLocation)   
@@ -678,6 +684,19 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 			}
 		}
 		break;
+	case IOCTL_CONTROL_NETWORK_SETEVENT:
+		{
+			ULONGLONG		EventHandle			= 0;
+
+			if(8 == uInSize)
+				EventHandle = *((PULONGLONG)buf);
+			else
+				EventHandle = (ULONGLONG)*((PULONG)buf);
+
+			ObReferenceObjectByHandle((PVOID)EventHandle, SYNCHRONIZE, *ExEventObjectType
+				, irp->RequestorMode, (PVOID*)&gEHomeNewworkEvent, NULL);
+		}
+		break;
 	case IOCTL_GET_DNS_INFO:
 		{
 			//KdPrint(("Http get info\n"));
@@ -846,6 +865,7 @@ NTSTATUS EhomeCloseCleanup(PDEVICE_OBJECT pDevObj,PIRP irp)
 	IsHttpAllow = TRUE;
 	gControlPID = NULL;
 	gEHomeFilterRule.rule = 0; // 停止监控
+	gEHomeNewworkEvent = NULL;
 	
 	gEHomeKeyword.noticeevent = NULL;
 	while(TRUE)
