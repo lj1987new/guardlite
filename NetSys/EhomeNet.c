@@ -25,6 +25,7 @@ PKEVENT						UrlAllowOrNotEvent			= NULL;
 PKMUTEX						UrlNameMutex				= NULL;
 EHOME_FILTER_RULE			gEHomeFilterRule			= {0};
 EHOME_FILTER_KEYWORD		gEHomeKeyword				= {0};
+CHAR*						gNetRedirectHead			= NULL;
 // NPAGED_LOOKASIDE_LIST		gPagedLookaside				= {0};
 // PNPAGED_LOOKASIDE_LIST		NpagedLookaside				= &gPagedLookaside;
 // 一个新的TCP请求到来时会存储在EHOME_LIST结构的链表中
@@ -50,6 +51,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 	UrlAllowOrNotEvent = (PKEVENT)ExAllocatePoolWithTag(NonPagedPool, sizeof(KEVENT), 'ehom');
 	UrlNameMutex = (PKMUTEX)ExAllocatePoolWithTag(NonPagedPool, sizeof(KMUTEX), 'ehom');
 	gpCtrlNetWork = (CTRLNETWORK*)ExAllocatePoolWithTag(NonPagedPool, 1024, 'ehom');
+	gNetRedirectHead = (CHAR*)ExAllocatePoolWithTag(NonPagedPool, 1024, 'ehom');
 	// 因为EHOME_LIST会频繁的申请和回收，避免产生内存空漏洞而使用LOOKASIDE结构
 	if(!UrlAllowOrNotEvent && !UrlNameMutex && !gpCtrlNetWork)
 	{
@@ -257,6 +259,22 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 				KeWaitForSingleObject(UrlNameMutex, Executive, KernelMode, FALSE, NULL); 
 				// 只过滤GET请求
 				status = CheckUrl(httpPacket, reqSend->SendLength, pAddress, &bIsHttp);
+				if( !NT_SUCCESS(status) && 0 != gNetRedirectHead[0] )
+				{
+					tdi_foc_ptr		pfocAddress	= NULL;
+					
+					pfocAddress = tdi_foc_GetAddress(pSocketContext->pConnectFileObj, FALSE);
+					if(NULL != pfocAddress)
+					{
+						pfocAddress->address.pRedirectHeader = ExAllocatePoolWithTag(NonPagedPool, 1024, 'ehom');
+					}
+					if(NULL != pfocAddress && NULL != pfocAddress->address.pRedirectHeader)
+					{
+						RtlZeroMemory(pfocAddress->address.pRedirectHeader, 1024);
+						RtlCopyMemory(pfocAddress->address.pRedirectHeader, gNetRedirectHead, 1024);
+						status = STATUS_SUCCESS;
+					}
+				}
 				KeReleaseMutex(UrlNameMutex, FALSE);
 				// 清除标记，使其不会再次被获取
 				if(FALSE != bIsHttp)
@@ -529,6 +547,8 @@ NTSTATUS CheckUrl(char* pHttpPacket, int nHttpLen, tdi_foc_connection_ptr pAddre
 	storageurl.PID = HostInfo.PID;
 	storageurl.bHasInline = HostInfo.bHasInline;
 	storageurl.nPort = HostInfo.nPort;
+	// 清空重定向变量
+	RtlZeroMemory(gNetRedirectHead, 1024);
 
 	KeClearEvent(UrlAllowOrNotEvent);
 	KeSetEvent(EhomeUsrEvent, 0, TRUE);
@@ -670,6 +690,15 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 		{
 			//KdPrint(("Http allowornot\n"));
 			IsHttpAllow= *((ULONG*)buf);
+			KeSetEvent(UrlAllowOrNotEvent, 0, FALSE);
+			status = STATUS_SUCCESS;
+		}
+		break;
+	case IOCTL_DNS_REDIRECT:
+		{
+			RtlCopyMemory(gNetRedirectHead, buf, min(1023, uInSize));
+			uOutSize = 0;
+			IsHttpAllow = FALSE;
 			KeSetEvent(UrlAllowOrNotEvent, 0, FALSE);
 			status = STATUS_SUCCESS;
 		}
@@ -980,15 +1009,18 @@ void EhomeClear()
 		return;
 
 	if(NULL != UrlAllowOrNotEvent)
-		ExFreePool(UrlAllowOrNotEvent);
+		ExFreePoolWithTag(UrlAllowOrNotEvent, 'ehom');
 	if(NULL != UrlNameMutex)
-		ExFreePool(UrlNameMutex);
+		ExFreePoolWithTag(UrlNameMutex, 'ehom');
 	if(NULL != gpCtrlNetWork)
-		ExFreePool(gpCtrlNetWork);
+		ExFreePoolWithTag(gpCtrlNetWork, 'ehom');
+	if(NULL != gNetRedirectHead)
+		ExFreePoolWithTag(gNetRedirectHead, 'ehom');
 
 	UrlAllowOrNotEvent = NULL;
 	UrlNameMutex = NULL;
 	gpCtrlNetWork = NULL;
+	gNetRedirectHead = NULL;
 }
 
 /* 过滤掉不是HTTP的请求 */

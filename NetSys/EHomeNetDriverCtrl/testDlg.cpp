@@ -6,7 +6,7 @@
 #include "testDlg.h"
 #include <WinIoCtl.h>
 // #include "../../EHome/EHomeDriver/EhomeNet1188/EhomeDevCtl.h"		// 驱动控制定义头文件
-#include "../../drivers/drivers_src/EhomeNet593/EhomeDevCtl.h"
+#include "../EhomeDevCtl.h"
 #include <Psapi.h>
 #include <shlwapi.h>
 #include <Winsvc.h>
@@ -205,8 +205,20 @@ void CtestDlg::DoSysUrlMon()
 			DeviceIoControl(m_hSysFile, IOCTL_GET_DNS_INFO, NULL, 0
 				, &info, sizeof(info), &dwRead, NULL);
 			lRet = CheckURL(info.PID, info.szUrl, info.bHasInline, info.nPort);
-			DeviceIoControl(m_hSysFile, IOCTL_DNS_ALLOW_OR_NOT, &lRet, sizeof(lRet)
-				, NULL, 0, &dwRead, NULL);
+			if(FALSE == lRet)
+			{
+				char*		pHead		= "HTTP/1.1 302 Object moved\r\n"
+					"Location: http://www.google.com.hk\r\n"
+					"Content-Length: 0\r\n"
+					"Content-Type: text/html\r\n\r\n";
+				DeviceIoControl(m_hSysFile, IOCTL_DNS_REDIRECT, pHead, (DWORD)strlen(pHead)
+					, NULL, 0, &dwRead, NULL);
+			}
+			else
+			{
+				DeviceIoControl(m_hSysFile, IOCTL_DNS_ALLOW_OR_NOT, &lRet, sizeof(lRet)
+					, NULL, 0, &dwRead, NULL);
+			}
 		}
 		else if((WAIT_OBJECT_0 + 1) == dwWait)
 		{

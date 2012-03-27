@@ -22,6 +22,7 @@ typedef struct
 	PVOID					event_receive_context;
 	PVOID					event_chained_handler;
 	PVOID					event_chained_context;
+	char*					pRedirectHeader;
 } tdi_foc_address;
 
 /* TDI½á¹¹Ìå */
