@@ -71,6 +71,12 @@
 #define IOCTL_CONTROL_FILTER_GET_BLOCK		CTL_CODE(FILE_DEVICE_UNKNOWN,\
 		0x0809, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
+/*
+ *	重定向阻止网页到指定的页面
+ *  传出参数: 转向指定页的主机头
+ */
+#define IOCTL_DNS_REDIRECT					CTL_CODE(FILE_DEVICE_UNKNOWN,\
+		0x0810, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 //////////////////////////////////////////////////////////////////////////
 #define NAMELENGTH     128
 #pragma pack(push, 1)

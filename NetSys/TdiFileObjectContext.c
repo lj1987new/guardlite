@@ -161,6 +161,11 @@ void				tdi_foc_Erase(PFILE_OBJECT pAddressFileObj)
 				ExFreePoolWithTag(pTemp->connecation.pHost, 'ehom');
 				pTemp->connecation.pHost = NULL;
 			}
+			else if(FALSE != pTemp->bIsAddressFileObj && NULL != pTemp->address.pRedirectHeader)
+			{
+				ExFreePoolWithTag(pTemp->address.pRedirectHeader, 'ehom');
+				pTemp->address.pRedirectHeader = NULL;
+			}
 			ExFreeToNPagedLookasideList(&g_tdi_foc_HashLookaside, pTemp);
 			//KdPrint(("[tdi_foc_Erase] delete %x from %d\n", pAddressFileObj, nIndex));
 			break;

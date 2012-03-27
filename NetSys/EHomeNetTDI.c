@@ -82,7 +82,7 @@ NTSTATUS EHomeClientEventReceive(IN PVOID  TdiEventContext, IN CONNECTION_CONTEX
 		return STATUS_DATA_NOT_ACCEPTED;
 	}
 	// 替换关键字
-	if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
+	if( FALSE != pSocketContext->bIsHttp )
 	{
 		EHomeFilterRecvData( pSocketContext, Tsdu, BytesIndicated, &bContinue );
 		if( FALSE == bContinue )
@@ -158,7 +158,7 @@ NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN
 		}
 	}
 	
-	if ( 0 != gEHomeFilterRule.rule && Irp->IoStatus.Status == STATUS_SUCCESS 
+	if ( Irp->IoStatus.Status == STATUS_SUCCESS 
 		&& NULL != pSockContext && pSockContext->bIsHttp ) 
 	{
 		PVOID		pData			= MmGetSystemAddressForMdlSafe(Irp->MdlAddress, NormalPagePriority);
@@ -250,7 +250,7 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 	{
 		return STATUS_DATA_NOT_ACCEPTED;
 	}
-	else if( FALSE != pSocketContext->bIsHttp && 0 != gEHomeFilterRule.rule )
+	else if( FALSE != pSocketContext->bIsHttp )
 	{
 		EHomeFilterRecvData(pSocketContext, (char *)pData + StartingOffset, ReceiveLength, &bContinue);
 		if( FALSE == bContinue )
@@ -326,6 +326,21 @@ NTSTATUS TdiCall (IN PIRP pIrp, IN PDEVICE_OBJECT pDeviceObject, IN OUT PIO_STAT
 void EHomeFilterRecvData(IN tdi_foc_ptr pAddressContext, IN PVOID pData, IN ULONG nLen, OUT BOOLEAN* pbContinue)
 {
 	*pbContinue = TRUE;
+	// 替换主机头
+	if(NULL != pAddressContext && pAddressContext->bIsAddressFileObj
+		&& NULL != pAddressContext->address.pRedirectHeader)
+	{
+		int			nHeadLen		= strlen(pAddressContext->address.pRedirectHeader);
+		int			index;
+
+		nHeadLen++; // 把0与复制过去
+		for(index = 0; index < (int)nLen && index < nHeadLen; index++)
+		{
+			((char *)pData)[index] = pAddressContext->address.pRedirectHeader[ index ];
+		}
+		return;
+	}
+	// 查找关键字
 	if(gEHomeFilterRule.rule > 0)
 	{
 		EHomeReplaceKeyword(pData, nLen);
@@ -427,5 +442,68 @@ BOOLEAN CheckIsTextHtmlData(IN CHAR* pData, IN ULONG nLen, IN BOOLEAN* pIsHttp)
 /* 关闭连接 */
 NTSTATUS tdi_close_connect(PFILE_OBJECT pFileObject)
 {
+	KEVENT					Event;
+	NTSTATUS				Status;
+	PDEVICE_OBJECT			DeviceObject;
+	IO_STATUS_BLOCK			IoStatus;
+	PIRP					Irp;
+
+	if(KeGetCurrentIrql() > APC_LEVEL)
+	{
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	KeInitializeEvent(&Event, NotificationEvent, FALSE);
+	DeviceObject = IoGetRelatedDeviceObject(pFileObject);
+	Irp = TdiBuildInternalDeviceControlIrp(TDI_DISCONNECT, DeviceObject, pFileObject, &Event, &IoStatus);
+	if (Irp == 0)
+	{
+		return STATUS_INSUFFICIENT_RESOURCES;
+	}
+
+	TdiBuildDisconnect(Irp, DeviceObject, pFileObject, 0, 0, 0, TDI_DISCONNECT_RELEASE, 0, 0);
+	Status = IoCallDriver(DeviceObject, Irp);
+	if (Status == STATUS_PENDING)
+	{
+		Status = KeWaitForSingleObject(&Event, UserRequest, KernelMode, FALSE, 0);
+	}
+
+	return Status == STATUS_SUCCESS ? IoStatus.Status : Status; 
+}
+
+/*
+ *	重定向到指定网页
+ */
+NTSTATUS DoNetRedirect(tdi_foc_ptr pfocConnect, char* pHeader)
+{
+	KIRQL			oldIrql;
+	tdi_foc_ptr		pfocAddress;
+	PMDL			pmdl;
+	NTSTATUS		status;
+
+	if(NULL == pfocConnect && pfocConnect->bIsAddressFileObj)
+		return STATUS_INSUFFICIENT_RESOURCES;
+	pfocAddress = tdi_foc_GetAddress(pfocConnect->pConnectFileObj, FALSE);
+	if(NULL == pfocAddress || NULL == pfocAddress->address.event_chained_handler)
+		return tdi_close_connect(pfocAddress->pConnectFileObj);
+	pmdl = IoAllocateMdl(pHeader, 1024, FALSE, FALSE, NULL);
+	if(NULL == pmdl)
+		return tdi_close_connect(pfocAddress->pConnectFileObj);
+	// 重定向
+	KeRaiseIrql(DISPATCH_LEVEL, &oldIrql);
+	MmBuildMdlForNonPagedPool(pmdl);
+	status = ((PTDI_IND_CHAINED_RECEIVE)pfocAddress->address.event_chained_handler)(
+		pfocAddress->address.event_chained_context
+		, pfocConnect->connecation.pConnectContext
+		, TDI_RECEIVE_AT_DISPATCH_LEVEL | TDI_RECEIVE_NORMAL
+		, strlen(pHeader)
+		, 0
+		, pmdl
+		, pHeader
+		);
+	IoFreeMdl(pmdl);
+	KeLowerIrql(oldIrql);
+	// 断开连接 - 不用断开， 上应用层自行断开
+	// tdi_close_connect(pfocAddress->pConnectFileObj);
 	return STATUS_SUCCESS;
 }
