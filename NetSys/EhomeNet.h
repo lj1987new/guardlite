@@ -77,7 +77,12 @@ NTSTATUS
 // VOID TdiDisConnect(PIRP irp,PIO_STACK_LOCATION stack);
 BOOL EhomeTDISend(PIRP irp,PIO_STACK_LOCATION stack);
 BOOL IsSkipDisnetwork(char* pProcName);		// 是否跳过的进程
-
+// 驱动功能
+typedef NTSTATUS (*FnEHomeControl)(IN PIRP pIrp, IN PIO_STACK_LOCATION pIrps, IN PVOID pInBuff, IN ULONG nInSize, OUT PVOID pOutBuff, IN OUT ULONG *pOutSize);
+typedef struct _EHOME_CONTROL_CALLBACK{
+	ULONG				code;
+	FnEHomeControl		fn;
+}EHOME_CONTROL_CALLBACK;
 // 设置事件句柄
 NTSTATUS		EHomeTDISetEventHandler(PIRP pIrp, PIO_STACK_LOCATION pStack);
 // 御载功能
@@ -94,3 +99,4 @@ NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN
 
 extern EHOME_FILTER_RULE		gEHomeFilterRule;
 extern EHOME_FILTER_KEYWORD		gEHomeKeyword;
+extern EHOME_CONTROL_CALLBACK	gEHomeControlCallback[];
