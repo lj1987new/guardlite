@@ -187,9 +187,9 @@ void CtestDlg::DoSysUrlMon()
 	hEvent[0] = CreateEvent(NULL, FALSE, FALSE, NULL);
 	hEvent[1] = CreateEvent(NULL, FALSE, FALSE, NULL);
 
-	DeviceIoControl(m_hSysFile, IOCTL_DNS_SETEVENT, &hEvent[0], sizeof(hEvent)
+	DeviceIoControl(m_hSysFile, IOCTL_DNS_SETEVENT, &hEvent[0], sizeof(HANDLE)
 		, NULL, 0, &dwRead, NULL);
-	DeviceIoControl(m_hSysFile, IOCTL_CONTROL_FILTER_SETEVENT, &hEvent[1], sizeof(hEvent)
+	DeviceIoControl(m_hSysFile, IOCTL_CONTROL_FILTER_SETEVENT, &hEvent[1], sizeof(HANDLE)
 		, NULL, 0, &dwRead, NULL);
 	do
 	{
