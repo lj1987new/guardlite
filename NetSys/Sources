@@ -8,4 +8,5 @@ SOURCES = EhomeNet.c \
 		  EHomeNetTDI.c \
 		  TdiFileObjectContext.c \
 		  Keyword.c \
+		  EHomeControl.c \ 
 

@@ -625,19 +625,14 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 	ULONG					uIoControlCode;
 	ULONG					uInSize;
 	ULONG					uOutSize;
-	ULONG					OnOrNot;
 	PDEVICE_EXTENTION		DevExt;
+	int						i;
 	
 	InterlockedIncrement(&gRefCount);
 	if(pDevObj != EhomeCtlDev)
 	{
 		// 过滤设备，跳过IPR请求
-#ifdef NO_UNLOAD
 		IoSkipCurrentIrpStackLocation(irp);
-#else
-		IoCopyCurrentIrpStackLocationToNext(irp);
-		IoSetCompletionRoutine(irp, DispatchRoutineComplate, NULL, TRUE, TRUE, TRUE);
-#endif
 		DevExt = (PDEVICE_EXTENTION)pDevObj->DeviceExtension;
 		__try
 		{
@@ -652,7 +647,6 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 		}
 		return status;
 	}
-	//KdPrint(("Enter Ehome devctl\n"));
 	// 控制设备处理IRP请求
 	stack = IoGetCurrentIrpStackLocation(irp);
 	// 控制设备缓存读写方式
@@ -660,173 +654,17 @@ NTSTATUS EhomeDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 	uIoControlCode = stack->Parameters.DeviceIoControl.IoControlCode;
 	uInSize = stack->Parameters.DeviceIoControl.InputBufferLength;
 	uOutSize = stack->Parameters.DeviceIoControl.OutputBufferLength;
-	OnOrNot = 0;
-	switch(uIoControlCode)
+	// 调用控制函数
+	status = STATUS_INVALID_DEVICE_REQUEST;
+	for( i = 0; 0 != gEHomeControlCallback[i].code; i++ )
 	{
-	case IOCTL_DNS_SETEVENT:
-		{	
-			//KdPrint(("Enter Dns SetEvent\n"));
-			ULONGLONG		EventHandle			= 0;
-
-			if(8 == uInSize)
-				EventHandle = *((PULONGLONG)buf);
-			else
-				EventHandle = (ULONGLONG)*((PULONG)buf);
-
-			status = ObReferenceObjectByHandle((PVOID)EventHandle, SYNCHRONIZE, *ExEventObjectType
-				, irp->RequestorMode, (PVOID*)&EhomeUsrEvent, NULL);
-			IsHttpFilterOn = TRUE;
-			gControlPID = PsGetCurrentProcess();
-			if(!NT_SUCCESS(status))
-			{
-				IsHttpFilterOn = FALSE;
-				//KdPrint(("GetEvent failed  %x  EventHandl:%x\n",status,EventHandle));
-			}
-		}
-		break;
-	case IOCTL_CONTROL_NETWORK_SETEVENT:
+		if(uIoControlCode == gEHomeControlCallback[i].code)
 		{
-			ULONGLONG		EventHandle			= 0;
-
-			if(8 == uInSize)
-				EventHandle = *((PULONGLONG)buf);
-			else
-				EventHandle = (ULONGLONG)*((PULONG)buf);
-
-			ObReferenceObjectByHandle((PVOID)EventHandle, SYNCHRONIZE, *ExEventObjectType
-				, irp->RequestorMode, (PVOID*)&gEHomeNewworkEvent, NULL);
+			status = gEHomeControlCallback[i].fn(irp, stack, buf, uInSize, buf, &uOutSize);
+			break; // 跳出循环
 		}
-		break;
-	case IOCTL_GET_DNS_INFO:
-		{
-			//KdPrint(("Http get info\n"));
-			uOutSize = min(uOutSize, sizeof(HostInfo));
-			memcpy(buf, &HostInfo, uOutSize);
-			status = STATUS_SUCCESS;
-		}
-		break;
-	case IOCTL_DNS_ALLOW_OR_NOT:
-		{
-			//KdPrint(("Http allowornot\n"));
-			IsHttpAllow= *((ULONG*)buf);
-			KeSetEvent(UrlAllowOrNotEvent, 0, FALSE);
-			status = STATUS_SUCCESS;
-		}
-		break;
-	case IOCTL_DNS_REDIRECT:
-		{
-			RtlCopyMemory(gNetRedirectHead, buf, min(1023, uInSize));
-			uOutSize = 0;
-			IsHttpAllow = FALSE;
-			KeSetEvent(UrlAllowOrNotEvent, 0, FALSE);
-			status = STATUS_SUCCESS;
-		}
-		break;
-	case IOCTL_CONTROL_NETWORK:
-		{
-			CTRLNETWORK*	pCtrl		= ((CTRLNETWORK *)buf);
-
-			if(uInSize < sizeof(CTRLNETWORK))
-			{
-				status = STATUS_INVALID_BLOCK_LENGTH;
-				break;
-			}
-			if(pCtrl->code > 0)
-			{
-				gpCtrlNetWork->code = 1;
-			}
-			else if(0 == pCtrl->code)
-			{
-				strncpy(gpCtrlNetWork->szPaseProc, pCtrl->szPaseProc, 1020);
-				_strlwr(gpCtrlNetWork->szPaseProc);
-				gpCtrlNetWork->code = 0;
-			}
-			if(uOutSize >= 4)
-			{
-				*((LONG *)buf) = (0 != gpCtrlNetWork->code);
-				uOutSize = 4;
-			}
-			else
-			{
-				uOutSize = 0;
-			}
-			status = STATUS_SUCCESS;
-		}
-		break;
-	case IOCTL_CONTROL_CLEARCACHE:
-		{
-			memset(&storageurl, 0, sizeof(storageurl));
-			status = STATUS_SUCCESS;
-			uOutSize = 0;
-		}
-		break;
-	case IOCTL_CONTROL_FILTER_RULE:
-		{
-			if(uInSize >= 4)
-			{
-				gEHomeFilterRule.rule = *((int *)buf);
-			}
-		}
-		break;
-	case IOCTL_CONTROL_FILTER_ADDKEYWORD:
-		{
-			if(uInSize > 0)
-			{
-				keyword_Add((char *)buf, uInSize);
-			}
-		}
-		break;
-	case IOCTL_CONTROL_FILTER_CLEARKEYWORD:
-		{
-			keyword_Clear();
-		}
-		break;
-	case IOCTL_CONTROL_FILTER_SETEVENT:
-		{
-			ULONGLONG		EventHandle			= 0;
-
-			if(8 == uInSize)
-				EventHandle = *((PULONGLONG)buf);
-			else
-				EventHandle = (ULONGLONG)*((PULONG)buf);
-
-			status = ObReferenceObjectByHandle((PVOID)EventHandle, SYNCHRONIZE, *ExEventObjectType
-				, irp->RequestorMode, (PVOID*)&gEHomeKeyword.noticeevent, NULL);
-			if( !NT_SUCCESS(status) )
-			{
-				gEHomeKeyword.noticeevent = NULL;
-			}
-		}
-		break;
-	case IOCTL_CONTROL_FILTER_GET_BLOCK:
-		{
-			PFILTER_KEYWORD_BLOCK		pfkb		= NULL;
-			PLIST_ENTRY					plist		= NULL;
-			KIRQL						oldIrql;
-
-			plist = ExInterlockedRemoveHeadList(&gEHomeKeyword.headlist, &gEHomeKeyword.spinlock);
-			if(NULL != plist)
-			{
-				pfkb = CONTAINING_RECORD(plist, FILTER_KEYWORD_BLOCK, list);
-				uOutSize = min(uOutSize, sizeof(FILTERKEYWORDBLOCK));
-				memcpy(buf, &pfkb->fkl, uOutSize);
-				ExFreeToNPagedLookasideList(&gEHomeKeyword.lookaside, pfkb);
-			}
-			else
-			{
-				uOutSize = 0;
-			}
-			// 判断是否还有数据未处理完
-			KeAcquireSpinLock(&gEHomeKeyword.spinlock, &oldIrql);
-			if(FALSE == IsListEmpty(&gEHomeKeyword.headlist))
-			{
-				KeSetEvent(gEHomeKeyword.noticeevent, 0, FALSE);
-			}
-			KeReleaseSpinLock(&gEHomeKeyword.spinlock, oldIrql);
-		}
-		break;
 	}
-
+	// 返回控制调用
 	if(status == STATUS_SUCCESS)
 		irp->IoStatus.Information = uOutSize;
 	else
