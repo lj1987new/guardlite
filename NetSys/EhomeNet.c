@@ -220,7 +220,7 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 		// 设置通知事件
 		if(TDI_CONNECT == stack->MinorFunction && NULL != gEHomeNewworkEvent)
 		{
-			KeSetEvent(gEHomeNewworkEvent, 0, TRUE);
+			KeSetEvent(gEHomeNewworkEvent, 0, FALSE);
 		}
 		goto stopirp;	// 停止IRP
 	}
