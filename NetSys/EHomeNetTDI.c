@@ -287,7 +287,7 @@ void EHomeReplaceKeyword(IN PVOID pData, IN ULONG nLen)
 		{
 			for(i = 0; i < nKeywordLen; i++)
 				pKeyWord[i] = '*';
-			pKeyWord += 4;
+			pKeyWord += nKeywordLen;
 			nSurplusLen = nLen - (int)( pKeyWord - (char *)pData);
 			if(nSurplusLen < 0)
 				break;
