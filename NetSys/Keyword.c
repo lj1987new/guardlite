@@ -122,6 +122,8 @@ void keyword_Add(char* pKeyword, ULONG nLen)
 		UCHAR			uchar		= (UCHAR)pKeyword[0];
 		BOOL			bAdd		= TRUE;
 
+		if(uchar >= 'A' && uchar <= 'Z')
+			uchar = uchar - 'A' + 'a';
 		for(pList = g_keyword_Index[uchar].list.Blink
 			; pList != &g_keyword_Index[uchar].list
 			; pList = pList->Blink)
@@ -140,10 +142,22 @@ void keyword_Add(char* pKeyword, ULONG nLen)
 			pKeyItem = ExAllocatePoolWithTag(NonPagedPool, sizeof(keyword_item) + nLen, 'ehom');
 			if(NULL != pKeyItem)
 			{
+				ULONG		k;
+				char*		pAddKey		= (char*)pKeyItem + sizeof(keyword_item);
+
+				// 添加关键字
 				pKeyItem->nSize = nLen;
-				memcpy((char*)pKeyItem + sizeof(keyword_item), pKeyword, nLen);
+				memcpy(pAddKey, pKeyword, nLen);
 				InsertHeadList(&g_keyword_Index[uchar].list, &pKeyItem->list);
 				g_keyword_Index[uchar].iskey = TRUE;
+				// 将关键字转换为小写
+				for(k = 0; k < pKeyItem->nSize; k++)
+				{
+					if(pAddKey[k] >='A' && pAddKey[k] <= 'Z')
+					{
+						pAddKey[k] = pAddKey[k] - 'A' + 'a';
+					}
+				}
 			}
 		}
 	}
@@ -163,12 +177,20 @@ BOOLEAN keyword_Find(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT 
 		// 开始查找操作
 		for(i = 0; i < nLenData && FALSE == bFind; i++)
 		{
-			UCHAR				uchar		= (UCHAR)pData[i];
-			PLIST_ENTRY			pList;
+			UCHAR					uchar			= (UCHAR)pData[i];
+			PLIST_ENTRY				pList;
 			keyword_item_ptr		pKeyItem;
+			CHAR					szKey[129];
 
+			if(uchar >= 'A' && uchar <= 'Z')
+				uchar = uchar - 'A' + 'a';
 			if(FALSE == g_keyword_Index[uchar].iskey)
 				continue;	// 快束查找
+			// 复制需要比较的缓冲区
+			memset(szKey, 0, sizeof(szKey));
+			memcpy(szKey, pData + i, 128);
+			_strlwr(szKey);
+			// 开始在字符串里找查
 			for(pList = g_keyword_Index[uchar].list.Blink
 				; pList != &g_keyword_Index[uchar].list
 				; pList = pList->Blink)
@@ -176,7 +198,7 @@ BOOLEAN keyword_Find(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT 
 				pKeyItem = CONTAINING_RECORD(pList, keyword_item, list);
 				if( (i + (int)pKeyItem->nSize) > nLenData )
 					continue;
-				if(memcmp(pData+i, (char*)pKeyItem+sizeof(keyword_item), pKeyItem->nSize) == 0)
+				if(memcmp(szKey, (char*)pKeyItem+sizeof(keyword_item), pKeyItem->nSize) == 0)
 				{
 					bFind = TRUE;
 					*ppKeyWord = pData + i;
