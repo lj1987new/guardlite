@@ -140,11 +140,12 @@ NTSTATUS EHomeCtrlAddKeyword(IN PIRP pIrp, IN PIO_STACK_LOCATION pIrps
 								, IN PVOID pInBuff, IN ULONG nInSize
 								, OUT PVOID pOutBuff, IN OUT ULONG *pOutSize)
 {
-	if(nInSize > 0)
+	if(nInSize > 128)
 	{
-		keyword_Add((char *)pInBuff, nInSize);
+		return STATUS_BUFFER_OVERFLOW;
 	}
 
+	keyword_Add((char *)pInBuff, nInSize);
 	return STATUS_SUCCESS;
 }
 /*
