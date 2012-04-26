@@ -332,11 +332,25 @@ void EHomeFilterRecvData(IN tdi_foc_ptr pAddressContext, IN PVOID pData, IN ULON
 	{
 		int			nHeadLen		= strlen(pAddressContext->address.pRedirectHeader);
 		int			index;
+		int			nCopy			= 0;
 
 		nHeadLen++; // 把0与复制过去
 		for(index = 0; index < (int)nLen && index < nHeadLen; index++)
 		{
-			((char *)pData)[index] = pAddressContext->address.pRedirectHeader[ index ];
+			((char *)pData)[index] = pAddressContext->address.pRedirectHeader[ nCopy++ ];
+		}
+		// 将余下的数据清0
+		if(index < (int)nLen)
+		{
+			((char *)pData)[index] = 0;
+		}
+		// 把复制后的数据清除
+		RtlZeroMemory(pAddressContext->address.pRedirectHeader, nCopy);
+		// 复制未COPY的数据
+		for(index = 0; index < (nHeadLen - nCopy); index++)
+		{
+			pAddressContext->address.pRedirectHeader[ index ] = 
+				pAddressContext->address.pRedirectHeader[ index + nCopy ];
 		}
 		return;
 	}
