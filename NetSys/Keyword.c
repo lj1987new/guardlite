@@ -188,7 +188,7 @@ BOOLEAN keyword_Find(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT 
 				continue;	// 快束查找
 			// 复制需要比较的缓冲区
 			memset(szKey, 0, sizeof(szKey));
-			memcpy(szKey, pData + i, 128);
+			memcpy(szKey, pData + i, min(128, nLenData - i));
 			_strlwr(szKey);
 			// 开始在字符串里找查
 			for(pList = g_keyword_Index[uchar].list.Blink
