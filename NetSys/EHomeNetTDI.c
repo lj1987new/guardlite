@@ -334,15 +334,15 @@ void EHomeFilterRecvData(IN tdi_foc_ptr pAddressContext, IN PVOID pData, IN ULON
 		int			index;
 		int			nCopy			= 0;
 
-		nHeadLen++; // 把0与复制过去
+// 		nHeadLen++; // 把0与复制过去 // 不能将0字符串复制进去， 不然会被认为是二进制文件
 		for(index = 0; index < (int)nLen && index < nHeadLen; index++)
 		{
 			((char *)pData)[index] = pAddressContext->address.pRedirectHeader[ nCopy++ ];
 		}
-		// 将余下的数据清0
-		if(index < (int)nLen)
+		// 将余下的数据清为空格
+		while(index < (int)nLen)
 		{
-			((char *)pData)[index] = 0;
+			((char *)pData)[index++] = '\x20';
 		}
 		// 把复制后的数据清除
 		RtlZeroMemory(pAddressContext->address.pRedirectHeader, nCopy);
