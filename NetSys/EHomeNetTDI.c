@@ -339,11 +339,11 @@ void EHomeFilterRecvData(IN tdi_foc_ptr pAddressContext, IN PVOID pData, IN ULON
 		{
 			((char *)pData)[index] = pAddressContext->address.pRedirectHeader[ nCopy++ ];
 		}
-		// 将余下的数据清为空格
-		while(index < (int)nLen)
-		{
-			((char *)pData)[index++] = '\x20';
-		}
+//		// 将余下的数据清为空格 // 这理不能有替换
+// 		while(index < (int)nLen)
+// 		{
+// 			((char *)pData)[index++] = '*';
+// 		}
 		// 把复制后的数据清除
 		RtlZeroMemory(pAddressContext->address.pRedirectHeader, nCopy);
 		// 复制未COPY的数据
