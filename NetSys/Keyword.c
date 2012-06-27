@@ -10,6 +10,7 @@ typedef struct
 {
 	LIST_ENTRY		list;
 	ULONG			nSize;
+	int				type;
 } keyword_item, *keyword_item_ptr;
 
 typedef struct 
@@ -96,7 +97,7 @@ void keyword_Clear()
 }
 
 /* 添加一个KEY */
-void keyword_Add(char* pKeyword, ULONG nLen)
+void keyword_Add(int type, char* pKeyword, ULONG nLen)
 {
 	keyword_item_ptr	pKeyItem	= NULL;
 	PLIST_ENTRY			pList		= NULL;
@@ -146,6 +147,7 @@ void keyword_Add(char* pKeyword, ULONG nLen)
 				char*		pAddKey		= (char*)pKeyItem + sizeof(keyword_item);
 
 				// 添加关键字
+				pKeyItem->type = type;
 				pKeyItem->nSize = nLen;
 				memcpy(pAddKey, pKeyword, nLen);
 				InsertHeadList(&g_keyword_Index[uchar].list, &pKeyItem->list);
@@ -165,7 +167,8 @@ void keyword_Add(char* pKeyword, ULONG nLen)
 }
 
 /* 查找关键字 */
-BOOLEAN keyword_Find(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT int* pLenKeyWord)
+BOOLEAN keyword_Find(IN char* pData, IN int nLenData, OUT char** ppKeyWord, 
+	OUT int* pLenKeyWord, OUT int* pType)
 {
 	int				i			= 0;
 	BOOLEAN			bFind		= FALSE;
@@ -203,6 +206,7 @@ BOOLEAN keyword_Find(IN char* pData, IN int nLenData, OUT char** ppKeyWord, OUT 
 					bFind = TRUE;
 					*ppKeyWord = pData + i;
 					*pLenKeyWord = pKeyItem->nSize;
+					*pType = pKeyItem->type;
 					break;
 				}
 			}

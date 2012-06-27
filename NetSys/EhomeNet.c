@@ -52,6 +52,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 	UrlAllowOrNotEvent = (PKEVENT)ExAllocatePoolWithTag(NonPagedPool, sizeof(KEVENT), 'ehom');
 	UrlNameMutex = (PKMUTEX)ExAllocatePoolWithTag(NonPagedPool, sizeof(KMUTEX), 'ehom');
 	gpCtrlNetWork = (CTRLNETWORK*)ExAllocatePoolWithTag(NonPagedPool, 1024, 'ehom');
+	strcpy(gpCtrlNetWork->szPaseProc, "|ehomesvr.exe|");
 	gNetRedirectHead = (CHAR*)ExAllocatePoolWithTag(NonPagedPool, 1024, 'ehom');
 	// 因为EHOME_LIST会频繁的申请和回收，避免产生内存空漏洞而使用LOOKASIDE结构
 	if(!UrlAllowOrNotEvent && !UrlNameMutex && !gpCtrlNetWork)
@@ -75,6 +76,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 		pDriverObj->MajorFunction[i] = Ehomedisp;
 	}
 	pDriverObj->MajorFunction[IRP_MJ_CLOSE] = EhomeCloseCleanup;
+	pDriverObj->MajorFunction[IRP_MJ_CLEANUP] = EhomeCloseCleanup;
 	pDriverObj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL] = EhomeInternalDevCtl;
 	pDriverObj->MajorFunction[IRP_MJ_DEVICE_CONTROL] = EhomeDevCtl;
 #if defined(DBG) && !defined(NO_UNLOAD)
@@ -210,7 +212,7 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 	epro = PsGetCurrentProcess();
 	if(epro == gControlPID)
 		goto skipirp;	// 跳过控制进程
-
+	
 	// 断网模式
 	if(0 == gpCtrlNetWork->code)
 	{
@@ -359,6 +361,8 @@ NTSTATUS EhomeInternalDevCtl(PDEVICE_OBJECT pDevObj,PIRP irp)
 		{
 			pSocketConnet->pConnectFileObj = pAddressFileObj;
 		}
+
+		ObDereferenceObject(pAddressFileObj);
 	}
 
 	goto skipirp;
@@ -424,7 +428,8 @@ NTSTATUS CheckNetwork(PIO_STACK_LOCATION pStack, PDEVICE_EXTENTION pDevExt, char
 				IPAdd = my_ntohl(((TDI_ADDRESS_IP *)(remote_addr->Address))->in_addr);
 				port = my_ntohs(((TDI_ADDRESS_IP *)(remote_addr->Address))->sin_port);
 
-				KdPrint(("%s: Connect %d.%d.%d.%d:%d \n"
+				KdPrint(("(%x)%s: Connect %d.%d.%d.%d:%d \n"
+					, pStack->FileObject
 					, pProcName
 					, (IPAdd >> 0x18) &0xff
 					, (IPAdd >> 0x10) & 0xff
@@ -436,7 +441,18 @@ NTSTATUS CheckNetwork(PIO_STACK_LOCATION pStack, PDEVICE_EXTENTION pDevExt, char
 			break;
 		case TDI_RECEIVE:
 		case TDI_SEND:
-			status = STATUS_INVALID_CONNECTION;
+			{
+				tdi_foc_ptr			ptr		= tdi_foc_GetConnection(pStack->FileObject, FALSE);
+
+				if(NULL != ptr && FALSE != ptr->bSelf)
+				{
+					status = STATUS_SUCCESS;
+				}
+				else
+				{
+					status = STATUS_INVALID_CONNECTION;
+				}
+			}
 			break;
 		}
 		if(!NT_SUCCESS(status) && FALSE == IsSkipDisnetwork(pProcName))
@@ -686,7 +702,7 @@ NTSTATUS EhomeCloseCleanup(PDEVICE_OBJECT pDevObj,PIRP irp)
 	stack = IoGetCurrentIrpStackLocation(irp);
 	if(pDevObj != EhomeCtlDev)
 	{
-		tdi_foc_ptr		pSockConnet		= tdi_foc_GetConnection(stack->FileObject, TRUE);
+		//tdi_foc_ptr		pSockConnet		= tdi_foc_GetConnection(stack->FileObject, TRUE);
 		// 过滤设备直接跳过
 		tdi_foc_Erase(stack->FileObject);
 #ifdef NO_UNLOAD
@@ -724,6 +740,7 @@ NTSTATUS EhomeCloseCleanup(PDEVICE_OBJECT pDevObj,PIRP irp)
 	InterlockedDecrement(&gRefCount);
 	return STATUS_SUCCESS;
 }
+
 USHORT my_ntohs(USHORT uPort)
 {
     USHORT a = (uPort << 8) & 0xFF00;
@@ -958,5 +975,9 @@ void EHomeTcpOpen(PIRP pIrp, PIO_STACK_LOCATION pIrps)
 	pConnect = tdi_foc_GetConnection(pFileObj, TRUE);
 	if(NULL == pConnect)
 		return;
+	if(IsSkipDisnetwork((char *)PsGetCurrentProcess() + NamePos))
+	{
+		pConnect->bSelf = TRUE;
+	}
 	pConnect->connecation.pConnectContext = *( (CONNECTION_CONTEXT *)(pFileEa->EaName + (pFileEa->EaNameLength + 1)) );
 }

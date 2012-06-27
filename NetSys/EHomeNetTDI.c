@@ -16,7 +16,7 @@ NTSTATUS	EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 								 , IN ULONG  ReceiveFlags, IN ULONG  ReceiveLength, IN ULONG  StartingOffset
 								 , IN PMDL  Tsdu, IN PVOID  TsduDescriptor);
 
-void		EHomeReplaceKeyword(IN PVOID pData, IN ULONG nLen);
+BOOLEAN		EHomeReplaceKeyword(IN PVOID pData, IN ULONG nLen);
 NTSTATUS	tdi_close_connect(PFILE_OBJECT pFileObject);
 
 // 设置事件句柄
@@ -273,8 +273,11 @@ NTSTATUS EHomeClientEventChainedReceive(IN PVOID  TdiEventContext, IN CONNECTION
 	return status;
 }
 
-/*替换关键字*/
-void EHomeReplaceKeyword(IN PVOID pData, IN ULONG nLen)
+/*
+ *	替换关键字
+ *  返回值，TRUE表示需要阻止, 返回为FALSE表示不需要阻止
+ */
+BOOLEAN EHomeReplaceKeyword(IN PVOID pData, IN ULONG nLen)
 {
 	__try
 	{
@@ -282,13 +285,18 @@ void EHomeReplaceKeyword(IN PVOID pData, IN ULONG nLen)
 		int				nKeywordLen		= 0;
 		int				nSurplusLen		= nLen;
 		int				i;
+		int				type			= 1;
 
-		while( keyword_Find(pKeyWord, nSurplusLen, &pKeyWord, &nKeywordLen) )
+		while( keyword_Find(pKeyWord, nSurplusLen, &pKeyWord, &nKeywordLen, &type) )
 		{
 			for(i = 0; i < nKeywordLen; i++)
 				pKeyWord[i] = '*';
 			pKeyWord += nKeywordLen;
 			nSurplusLen = nLen - (int)( pKeyWord - (char *)pData);
+			if(type < 0)
+			{
+				return TRUE; // 阻止
+			}
 			if(nSurplusLen < 0)
 				break;
 		}
@@ -297,6 +305,8 @@ void EHomeReplaceKeyword(IN PVOID pData, IN ULONG nLen)
 	{
 		KdPrint(("[EHomeReplaceKeyword] EXCEPTION_EXECUTE_HANDLER\n"));
 	}
+
+	return FALSE;
 }
 
 // 调用驱动
@@ -354,20 +364,14 @@ void EHomeFilterRecvData(IN tdi_foc_ptr pAddressContext, IN PVOID pData, IN ULON
 		}
 		return;
 	}
-	// 查找关键字
-	if(gEHomeFilterRule.rule > 0)
+	// 关键字过滤未开启
+	if(0 == gEHomeFilterRule.rule)
 	{
-		EHomeReplaceKeyword(pData, nLen);
+		return;
 	}
-	else if(gEHomeFilterRule.rule < 0)
+	// 查找关键字
+	if( EHomeReplaceKeyword(pData, nLen) )
 	{
-		char*					pKeyword			= NULL;
-		int						nKeywordLen			= 0;
-		PIRP					pIrp				= NULL;
-		IO_STATUS_BLOCK			IoStatusBlock		= {0};
-
-		if( FALSE == keyword_Find(pData, nLen, &pKeyword, &nKeywordLen) )
-			return;
  		// 断开连接
 		*pbContinue = FALSE;
 		// 添加断开连接记录

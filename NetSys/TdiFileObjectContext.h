@@ -28,6 +28,7 @@ typedef struct
 /* TDI结构体 */
 typedef struct {
 	LIST_ENTRY				list;
+	BOOLEAN					bSelf;					/* 是否自己 */
 	BOOLEAN					bIsAddressFileObj;		/* 是否本地端口 */
 	PFILE_OBJECT			pAddressFileObj;		/* 本地地址对像 */
 	PFILE_OBJECT			pConnectFileObj;		/* 连接端口对像 */

@@ -100,3 +100,4 @@ NTSTATUS tdi_client_irp_complete(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp, IN
 extern EHOME_FILTER_RULE		gEHomeFilterRule;
 extern EHOME_FILTER_KEYWORD		gEHomeKeyword;
 extern EHOME_CONTROL_CALLBACK	gEHomeControlCallback[];
+

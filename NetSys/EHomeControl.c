@@ -145,7 +145,24 @@ NTSTATUS EHomeCtrlAddKeyword(IN PIRP pIrp, IN PIO_STACK_LOCATION pIrps
 		return STATUS_BUFFER_OVERFLOW;
 	}
 
-	keyword_Add((char *)pInBuff, nInSize);
+	keyword_Add(-1, (char *)pInBuff, nInSize);
+	return STATUS_SUCCESS;
+}
+/*
+ *	Ìí¼Ó¹Ø¼ü×Ö
+ */
+NTSTATUS EHomeCtrlAddKeywordEx(IN PIRP pIrp, IN PIO_STACK_LOCATION pIrps
+	, IN PVOID pInBuff, IN ULONG nInSize
+	, OUT PVOID pOutBuff, IN OUT ULONG *pOutSize)
+{
+	KEYWORKITEM		*pItem		= (KEYWORKITEM *)pInBuff;
+
+	if(nInSize > sizeof(KEYWORKITEM))
+	{
+		return STATUS_BUFFER_OVERFLOW;
+	}
+
+	keyword_Add(pItem->type, pItem->szWork, strlen(pItem->szWork));
 	return STATUS_SUCCESS;
 }
 /*
@@ -267,6 +284,7 @@ EHOME_CONTROL_CALLBACK	gEHomeControlCallback[] = {
 	, { IOCTL_CONTROL_CLEARCACHE, EHomeCtrlClearCache }
 	, { IOCTL_CONTROL_FILTER_RULE, EHomeCtrlSetFilterRule }
 	, { IOCTL_CONTROL_FILTER_ADDKEYWORD, EHomeCtrlAddKeyword }
+	, { IOCTL_CONTROL_FILTER_ADDKEYWORDEX, EHomeCtrlAddKeywordEx } 
 	, { IOCTL_CONTROL_FILTER_CLEARKEYWORD, EHomeCtrlClearKeyword }
 	, { IOCTL_CONTROL_FILTER_SETEVENT, EHomeCtrlSetFilterEvent }
 	, { IOCTL_CONTROL_FILTER_GET_BLOCK, EHomeCtrlGetFilterBlock }
