@@ -1,0 +1,1 @@
+你之所以没有被检测出盘符,是因为你的过滤驱动是挂在{36FC9E60-C465-11CF-8056-444553540000}下,而不是{4D36E967-E325-11CE-BFC1-08002BE10318}。前者是USB Controller的GUID，后者是U盘这类Disk Device的Class GUID。
