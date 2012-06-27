@@ -1,0 +1,12 @@
+TARGETNAME=usbfilter
+TARGETPATH=F:\Out\Bin\EhomeDriver
+TARGETTYPE=DRIVER
+C_DEFINES=
+
+TARGETLIBS= $(TARGETLIBS)
+
+INCLUDES=$(BASEDIR)\inc;\
+         $(BASEDIR)\inc\ddk;\
+
+SOURCES = usbfilter.c
+
