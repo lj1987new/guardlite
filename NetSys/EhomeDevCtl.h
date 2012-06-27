@@ -85,6 +85,14 @@
 #define IOCTL_CONTROL_NETWORK_SETEVENT		CTL_CODE(FILE_DEVICE_UNKNOWN,\
 		0x0811, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
+/*
+ *	添加关键字过滤
+ *  设置要过滤的关键字
+ *  添加的关键字是一个结构体， KEYWORKITEM
+ */
+#define IOCTL_CONTROL_FILTER_ADDKEYWORDEX	CTL_CODE(FILE_DEVICE_UNKNOWN,\
+		0x0812, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
 //////////////////////////////////////////////////////////////////////////
 #define NAMELENGTH     128
 #pragma pack(push, 1)
@@ -111,5 +119,11 @@ typedef struct _FilterKeywordBlock{
 	ULONG		nPort;					// 端口号
 	CHAR		szHost[128];			// 截获的HOST
 } FILTERKEYWORDBLOCK;
+
+// 添加关键字结构体
+typedef struct _KeyworkItem{
+	int			type;					// 处理方式 >0 替换 <0 阻止
+	CHAR		szWork[128];			// 关键字
+} KEYWORKITEM;
 #pragma pack(pop)
 
