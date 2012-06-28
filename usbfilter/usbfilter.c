@@ -1,6 +1,8 @@
 #include "usbfilter.h"
 #include <srb.h>
 #include <scsi.h>
+#include <usbdi.h>
+#include <usbdlib.h>
 
 /*
  *	驱动入口函数
@@ -40,11 +42,56 @@ void ufd_unload(IN PDRIVER_OBJECT DriverObject)
 NTSTATUS ufd_add_device(IN PDRIVER_OBJECT DriverObject, 
 						IN PDEVICE_OBJECT pdo)
 {
-	NTSTATUS				status;
-	PDEVICE_OBJECT			fido;
-	device_extension_ptr	pdx;
-	PDEVICE_OBJECT			fdo;
-
+	NTSTATUS							status;
+	PDEVICE_OBJECT						fido;
+	device_extension_ptr				pdx;
+	PDEVICE_OBJECT						fdo;
+// 	HANDLE								handle;
+// 	URB									urb;
+// 	//PUSB_STRING_DESCRIPTOR				pusd;
+// 	PUSB_DEVICE_DESCRIPTOR				pudd;
+// 	LONG								size;
+// 	
+// 	//获取设备信息
+// 	pudd = ExAllocatePoolWithTag(NonPagedPool, sizeof(USB_DEVICE_DESCRIPTOR), 'ehom');
+// 	pudd->bLength = sizeof(USB_DEVICE_DESCRIPTOR);
+// 	pudd->bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
+// 	UsbBuildGetDescriptorRequest(&urb, 
+// 		(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+// 		USB_STRING_DESCRIPTOR_TYPE, 0, 0, pudd, NULL, 
+// 		 sizeof(USB_DEVICE_DESCRIPTOR), NULL);
+// 	status = ufd_CallUSBD(pdo, &urb);
+// 	KdPrint(("get urb retrun: %x\n", status));
+// 	if( NT_SUCCESS(status) )
+// 	{
+// // 		size = pusd->bLength * sizeof(WCHAR) + sizeof(PUSB_STRING_DESCRIPTOR);
+// // 		pusd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
+// // 		RtlZeroMemory(pusd, size);
+// // 		pusd->bLength = (size - sizeof(PUSB_STRING_DESCRIPTOR)) / 2;
+// // 		pusd->bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
+// // 		UsbBuildGetDescriptorRequest(&urb, 
+// // 			(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+// // 			USB_STRING_DESCRIPTOR_TYPE, 0, 0, pusd, NULL, 
+// // 			size, NULL);
+// // 		status = ufd_CallUSBD(pdo, &urb);
+// // 		if( NT_SUCCESS(status) )
+// // 		{
+// // 			KdPrint(("Get string Descriptor: %S\n", pusd->bString));
+// // 		}
+// 
+// // 		size = pucd->wTotalLength;
+// // 		ExFreePoolWithTag(pucd, 'ehom');
+// // 		pucd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
+// // 		UsbBuildGetDescriptorRequest(&urb, 
+// // 			(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+// // 			USB_CONFIGURATION_DESCRIPTOR_TYPE, 0, 0, pucd, NULL, 
+// // 			size, NULL);
+// // 		status = ufd_CallUSBD(pdo, &urb);
+// 		
+// 	}
+// 
+// 	ExFreePoolWithTag(pudd, 'ehom');
+	// 创建设备
 	KdPrint(("usbfilter.sys!!! ufd_add_device enter[%wZ]\n", &DriverObject->DriverName));
 	status = IoCreateDevice(DriverObject, sizeof(device_extension), NULL,
 		ufd_get_device_type(pdo), 0, FALSE, &fido);
@@ -132,7 +179,7 @@ NTSTATUS ufd_dispatch_power(IN PDEVICE_OBJECT device_object, IN PIRP irp)
 	if( !NT_SUCCESS(status) )
 	{
 		irp->IoStatus.Status = status;
-		irp->IoStatus.Information = NULL;
+		irp->IoStatus.Information = 0;
 
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 		return status;
@@ -170,23 +217,11 @@ NTSTATUS ufd_dispatch_pnp(IN PDEVICE_OBJECT device_object, IN PIRP irp)
 
 	if(IRP_MN_START_DEVICE == stack->MinorFunction)
 	{
-		PDRIVER_OBJECT			pDriver;
-		UNICODE_STRING			usName;
-
-		pDriver = pdx->lower_device_object->DriverObject;
-		RtlInitUnicodeString(&usName, L"\\driver\\usbstor");
-		KdPrint(("usbfilter.sys!!! IRP_MN_START_DEVICE: %wZ <=> %wZ\n", 
-			&pDriver->DriverName, &usName));
-		if( 0 == RtlCompareUnicodeString(&usName, &pDriver->DriverName, TRUE) )
+		status = ufd_dispatch_pnp_start_device(device_object, irp);
+		if( !NT_SUCCESS(status) )
 		{
-			// 获取设备名
-			irp->IoStatus.Information = 0;
-			irp->IoStatus.Status = STATUS_UNSUCCESSFUL;
-
 			IoReleaseRemoveLock(&pdx->remove_lock, irp);
-			IoCompleteRequest(irp, IO_NO_INCREMENT);
-
-			return STATUS_UNSUCCESSFUL;
+			return status;
 		}
 	}
 
@@ -229,6 +264,98 @@ NTSTATUS ufd_dispatch_pnp(IN PDEVICE_OBJECT device_object, IN PIRP irp)
 	IoReleaseRemoveLock(&pdx->remove_lock, irp);
 
 	return status;
+}
+/*
+ *	开启设备
+ */
+NTSTATUS ufd_dispatch_pnp_start_device(IN PDEVICE_OBJECT device_object, 
+									   IN PIRP irp)
+{
+	PDRIVER_OBJECT						pDriver;
+	UNICODE_STRING						usName;
+	device_extension_ptr				pdx;
+	NTSTATUS							status;
+	HANDLE								handle;
+	URB									urb;
+	PUSB_STRING_DESCRIPTOR				pusd;
+	PUSB_DEVICE_DESCRIPTOR				pudd;
+	LONG								size;
+
+	pdx = (device_extension_ptr)device_object->DeviceExtension;
+	//获取设备信息
+	size = sizeof(USB_DEVICE_DESCRIPTOR);
+	pudd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
+	UsbBuildGetDescriptorRequest(&urb, 
+		(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+		USB_DEVICE_DESCRIPTOR_TYPE, 0, 0, pudd, NULL, 
+		size, NULL);
+ 	status = ufd_CallUSBD(pdx->lower_device_object, &urb);
+	KdPrint(("get urb retrun: %x\n", status));
+	if( NT_SUCCESS(status) )
+	{
+		size = 1024;
+		pusd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
+		pusd->bLength = size;
+		UsbBuildGetDescriptorRequest(&urb, 
+			(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+			USB_STRING_DESCRIPTOR_TYPE, pudd->iSerialNumber, 936, pusd, NULL, 
+			size, NULL);
+		status = ufd_CallUSBD(pdx->lower_device_object, &urb);
+		KdPrint(("serial number: %S\n", pusd->bString));
+		ExFreePoolWithTag(pusd, 'ehom');
+		// 取设备类型　
+		{
+			PUSB_INTERFACE_DESCRIPTOR		puid;
+			PUSB_CONFIGURATION_DESCRIPTOR	pucd;
+
+			size = sizeof(USB_CONFIGURATION_DESCRIPTOR);
+			pucd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
+			UsbBuildGetDescriptorRequest(&urb, 
+				(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+				USB_CONFIGURATION_DESCRIPTOR_TYPE, 0, 0, pucd, NULL, 
+				size, NULL);
+			status = ufd_CallUSBD(pdx->lower_device_object, &urb);
+			if( NT_SUCCESS(status) )
+			{
+				size = pucd->wTotalLength;
+				ExFreePoolWithTag(pucd, 'ehom');
+				pucd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
+				UsbBuildGetDescriptorRequest(&urb, 
+					(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+					USB_CONFIGURATION_DESCRIPTOR_TYPE, 0, 0, pucd, NULL, 
+					size, NULL);
+				status = ufd_CallUSBD(pdx->lower_device_object, &urb);
+				if( NT_SUCCESS(status) )
+				{
+#define INTERFACENUMBER 0  
+#define ALTERNATESETTING 1  
+					puid = USBD_ParseConfigurationDescriptorEx(pucd, pucd, 
+						INTERFACENUMBER,
+						0/*ALTERNATESETTING*/,
+						-1, -1, -1);
+				}
+			}
+			ExFreePoolWithTag(pucd, 'ehom');
+		}
+	}
+
+	ExFreePoolWithTag(pudd, 'ehom');
+	// 过滤设置
+	pDriver = pdx->lower_device_object->DriverObject;
+	RtlInitUnicodeString(&usName, L"\\driver\\usbstor");
+	KdPrint(("usbfilter.sys!!! IRP_MN_START_DEVICE: %wZ <=> %wZ\n", 
+		&pDriver->DriverName, &usName));
+	if( 0 == RtlCompareUnicodeString(&usName, &pDriver->DriverName, TRUE) )
+	{
+		// 获取设备名
+		irp->IoStatus.Information = 0;
+		irp->IoStatus.Status = STATUS_UNSUCCESSFUL;
+
+		IoCompleteRequest(irp, IO_NO_INCREMENT);
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	return STATUS_SUCCESS;
 }
 /*
  *	SCSI例程
@@ -322,7 +449,7 @@ NTSTATUS ufd_completion_scsi(IN PDEVICE_OBJECT device_object,
 	stack = IoGetCurrentIrpStackLocation(irp);
 	
 	srb = stack->Parameters.Scsi.Srb;
-	cdb = srb->Cdb;
+	cdb = (PCDB)srb->Cdb;
 	code = cdb->CDB6GENERIC.OperationCode;
 	
 	KdPrint(("usbfilter.sys!!! [0x%x]ufd_completion_scsi code=0x%x\n", 
@@ -381,4 +508,60 @@ ULONG ufd_get_device_type(PDEVICE_OBJECT pdo)
 	ObDereferenceObject(ldo);
 
 	return type;
+}
+
+NTSTATUS ufd_CallUSBD(IN PDEVICE_OBJECT fdo, IN PURB Urb)
+{  
+   NTSTATUS					ntStatus, status = STATUS_SUCCESS;  
+   PIRP						irp;  
+   KEVENT					event;  
+   IO_STATUS_BLOCK			ioStatus;  
+   PIO_STACK_LOCATION		nextStack;  
+  
+     // issue a synchronous request (see notes above)  
+   KeInitializeEvent(&event, NotificationEvent, FALSE);  
+  
+   irp = IoBuildDeviceIoControlRequest(  
+             IOCTL_INTERNAL_USB_SUBMIT_URB,  
+             fdo,  
+             NULL,  
+             0,  
+             NULL,  
+             0,  
+             TRUE, /* INTERNAL */  
+             &event,  
+             &ioStatus);  
+  
+   // Prepare for calling the USB driver stack  
+   nextStack = IoGetNextIrpStackLocation(irp);  
+   ASSERT(nextStack != NULL);  
+  
+   // Set up the URB ptr to pass to the USB driver stack  
+   nextStack->Parameters.Others.Argument1 = Urb;  
+  
+    ntStatus = IoCallDriver(fdo, irp);  
+    
+   if (ntStatus == STATUS_PENDING)  
+   {  
+      status = KeWaitForSingleObject(  
+                    &event,  
+                    Suspended,  
+                    KernelMode,  
+                    FALSE,  
+                    NULL);  
+   }  
+   else  
+   {  
+      ioStatus.Status = ntStatus;  
+   }  
+  
+   ntStatus = ioStatus.Status;  
+  
+   if (NT_SUCCESS(ntStatus))  
+   {  
+      if (!(USBD_SUCCESS(Urb->UrbHeader.Status)))  
+         ntStatus = STATUS_UNSUCCESSFUL;  
+   } 
+  
+   return ntStatus;  
 }
