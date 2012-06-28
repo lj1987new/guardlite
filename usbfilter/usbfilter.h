@@ -1,4 +1,5 @@
 #include <wdm.h>
+#include <usb.h>
 
 typedef struct _device_extension
 {
@@ -16,6 +17,8 @@ NTSTATUS	ufd_add_device(IN PDRIVER_OBJECT DriverObject,
 NTSTATUS	ufd_dispatch_default(IN PDEVICE_OBJECT device_object, IN PIRP irp);
 NTSTATUS	ufd_dispatch_power(IN PDEVICE_OBJECT device_object, IN PIRP irp);
 NTSTATUS	ufd_dispatch_pnp(IN PDEVICE_OBJECT device_object, IN PIRP irp);
+NTSTATUS	ufd_dispatch_pnp_start_device(IN PDEVICE_OBJECT device_object, 
+										  IN PIRP irp);
 NTSTATUS	ufd_dispatch_scsi(IN PDEVICE_OBJECT device_object, IN PIRP irp);
 
 NTSTATUS	ufd_completion_usage_notification(IN PDEVICE_OBJECT device_object, 
@@ -26,6 +29,7 @@ NTSTATUS	ufd_completion_scsi(IN PDEVICE_OBJECT device_object,
 										IN PIRP irp, IN PVOID Context);
 
 
+NTSTATUS	ufd_CallUSBD(IN PDEVICE_OBJECT fdo, IN PURB Urb);
 void		ufd_driver_removedevice(IN PDEVICE_OBJECT device_object);
 ULONG		ufd_get_device_type(PDEVICE_OBJECT pdo);
 
