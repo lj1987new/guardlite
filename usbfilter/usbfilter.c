@@ -45,7 +45,7 @@ NTSTATUS ufd_add_device(IN PDRIVER_OBJECT DriverObject,
 	device_extension_ptr	pdx;
 	PDEVICE_OBJECT			fdo;
 
-	KdPrint(("usbfilter.sys!!! ufd_add_device enter\n"));
+	KdPrint(("usbfilter.sys!!! ufd_add_device enter[%wZ]\n", &DriverObject->DriverName));
 	status = IoCreateDevice(DriverObject, sizeof(device_extension), NULL,
 		ufd_get_device_type(pdo), 0, FALSE, &fido);
 	if( !NT_SUCCESS(status) )
@@ -99,8 +99,8 @@ NTSTATUS ufd_dispatch_default(IN PDEVICE_OBJECT device_object, IN PIRP irp)
 
 	pdx = (device_extension_ptr)device_object->DeviceExtension;
 	stack = IoGetCurrentIrpStackLocation(irp);
-	KdPrint(("usbfilter.sys!!! ufd_dispatch_default: MJ(0x%x), MN(%d)\n",
-		stack->MajorFunction, stack->MinorFunction));
+	KdPrint(("usbfilter.sys!!! [0x%x]ufd_dispatch_default: MJ(0x%x), MN(0x%x)\n",
+		device_object, stack->MajorFunction, stack->MinorFunction));
 
 	status = IoAcquireRemoveLock(&pdx->remove_lock, irp);
 	if( !NT_SUCCESS(status) )
@@ -125,6 +125,7 @@ NTSTATUS ufd_dispatch_power(IN PDEVICE_OBJECT device_object, IN PIRP irp)
 	device_extension_ptr		pdx;
 	NTSTATUS					status;
 
+	KdPrint(("usbfilter.sys!!! [0x%x]ufd_dispatch_power enter\n", device_object));
 	pdx = (device_extension_ptr)device_object->DeviceExtension;
 	PoStartNextPowerIrp(irp);
 	status = IoAcquireRemoveLock(&pdx->remove_lock, irp);
@@ -154,7 +155,8 @@ NTSTATUS ufd_dispatch_pnp(IN PDEVICE_OBJECT device_object, IN PIRP irp)
 
 	pdx = (device_extension_ptr)device_object->DeviceExtension;
 	stack = IoGetCurrentIrpStackLocation(irp);
-	KdPrint(("usbfilter.sys!!! ufd_dispatch_pnp: MN(%d)\n", stack->MinorFunction));
+	KdPrint(("usbfilter.sys!!! [0xx%x]ufd_dispatch_pnp: MN(0x%x)\n", 
+		device_object, stack->MinorFunction));
 	
 	status = IoAcquireRemoveLock(&pdx->remove_lock, irp);
 	if( !NT_SUCCESS(status) )
@@ -164,6 +166,28 @@ NTSTATUS ufd_dispatch_pnp(IN PDEVICE_OBJECT device_object, IN PIRP irp)
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
 		
 		return status;
+	}
+
+	if(IRP_MN_START_DEVICE == stack->MinorFunction)
+	{
+		PDRIVER_OBJECT			pDriver;
+		UNICODE_STRING			usName;
+
+		pDriver = pdx->lower_device_object->DriverObject;
+		RtlInitUnicodeString(&usName, L"\\driver\\usbstor");
+		KdPrint(("usbfilter.sys!!! IRP_MN_START_DEVICE: %wZ <=> %wZ\n", 
+			&pDriver->DriverName, &usName));
+		if( 0 == RtlCompareUnicodeString(&usName, &pDriver->DriverName, TRUE) )
+		{
+			// 获取设备名
+			irp->IoStatus.Information = 0;
+			irp->IoStatus.Status = STATUS_UNSUCCESSFUL;
+
+			IoReleaseRemoveLock(&pdx->remove_lock, irp);
+			IoCompleteRequest(irp, IO_NO_INCREMENT);
+
+			return STATUS_UNSUCCESSFUL;
+		}
 	}
 
 	if(IRP_MN_DEVICE_USAGE_NOTIFICATION == stack->MinorFunction)
@@ -215,7 +239,7 @@ NTSTATUS ufd_dispatch_scsi(IN PDEVICE_OBJECT device_object, IN PIRP irp)
 	PIO_STACK_LOCATION			stack;
 	NTSTATUS					status;
 
-	KdPrint(("usbfilter.sys!!! ufd_dispatch_scsi enter\n"));
+	KdPrint(("usbfilter.sys!!! [0x%x]ufd_dispatch_scsi enter\n", device_object));
 	pdx = (device_extension_ptr)device_object->DeviceExtension;
 	stack = IoGetCurrentIrpStackLocation(irp);
 	status = IoAcquireRemoveLock(&pdx->remove_lock, irp);
@@ -301,6 +325,8 @@ NTSTATUS ufd_completion_scsi(IN PDEVICE_OBJECT device_object,
 	cdb = srb->Cdb;
 	code = cdb->CDB6GENERIC.OperationCode;
 	
+	KdPrint(("usbfilter.sys!!! [0x%x]ufd_completion_scsi code=0x%x\n", 
+		device_object, code));
 	if(SCSIOP_MODE_SENSE == code && srb->DataBuffer
 		&& srb->DataTransferLength >= sizeof(MODE_PARAMETER_HEADER))
 	{
