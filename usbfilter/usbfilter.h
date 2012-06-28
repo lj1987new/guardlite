@@ -28,6 +28,12 @@ NTSTATUS	ufd_completion_start_device(IN PDEVICE_OBJECT device_object,
 NTSTATUS	ufd_completion_scsi(IN PDEVICE_OBJECT device_object, 
 										IN PIRP irp, IN PVOID Context);
 
+NTSTATUS	ufd_get_usb_info(PDEVICE_OBJECT fdo, USHORT* pvid, USHORT* ppid, 
+							 WCHAR* pmanuf, WCHAR* pproduct, WCHAR* psn);
+NTSTATUS	ufd_get_usb_class(PDEVICE_OBJECT fdo, UCHAR* pclass);
+NTSTATUS	ufd_check_usb_class(UCHAR uclass);
+NTSTATUS	ufd_check_usb_skip(USHORT vid, USHORT pid, WCHAR* pmanuf, 
+							   WCHAR* pproduct, WCHAR* psn);
 
 NTSTATUS	ufd_CallUSBD(IN PDEVICE_OBJECT fdo, IN PURB Urb);
 void		ufd_driver_removedevice(IN PDEVICE_OBJECT device_object);
