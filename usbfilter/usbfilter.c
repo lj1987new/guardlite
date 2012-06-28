@@ -23,7 +23,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 
 	pDriverObj->MajorFunction[IRP_MJ_POWER] = ufd_dispatch_power;
 	pDriverObj->MajorFunction[IRP_MJ_PNP] = ufd_dispatch_pnp;
-	pDriverObj->MajorFunction[IRP_MJ_SCSI] = ufd_dispatch_scsi;
+//	pDriverObj->MajorFunction[IRP_MJ_SCSI] = ufd_dispatch_scsi;
 
 	return STATUS_SUCCESS;
 }
@@ -46,51 +46,7 @@ NTSTATUS ufd_add_device(IN PDRIVER_OBJECT DriverObject,
 	PDEVICE_OBJECT						fido;
 	device_extension_ptr				pdx;
 	PDEVICE_OBJECT						fdo;
-// 	HANDLE								handle;
-// 	URB									urb;
-// 	//PUSB_STRING_DESCRIPTOR				pusd;
-// 	PUSB_DEVICE_DESCRIPTOR				pudd;
-// 	LONG								size;
-// 	
-// 	//获取设备信息
-// 	pudd = ExAllocatePoolWithTag(NonPagedPool, sizeof(USB_DEVICE_DESCRIPTOR), 'ehom');
-// 	pudd->bLength = sizeof(USB_DEVICE_DESCRIPTOR);
-// 	pudd->bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
-// 	UsbBuildGetDescriptorRequest(&urb, 
-// 		(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
-// 		USB_STRING_DESCRIPTOR_TYPE, 0, 0, pudd, NULL, 
-// 		 sizeof(USB_DEVICE_DESCRIPTOR), NULL);
-// 	status = ufd_CallUSBD(pdo, &urb);
-// 	KdPrint(("get urb retrun: %x\n", status));
-// 	if( NT_SUCCESS(status) )
-// 	{
-// // 		size = pusd->bLength * sizeof(WCHAR) + sizeof(PUSB_STRING_DESCRIPTOR);
-// // 		pusd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
-// // 		RtlZeroMemory(pusd, size);
-// // 		pusd->bLength = (size - sizeof(PUSB_STRING_DESCRIPTOR)) / 2;
-// // 		pusd->bDescriptorType = USB_STRING_DESCRIPTOR_TYPE;
-// // 		UsbBuildGetDescriptorRequest(&urb, 
-// // 			(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
-// // 			USB_STRING_DESCRIPTOR_TYPE, 0, 0, pusd, NULL, 
-// // 			size, NULL);
-// // 		status = ufd_CallUSBD(pdo, &urb);
-// // 		if( NT_SUCCESS(status) )
-// // 		{
-// // 			KdPrint(("Get string Descriptor: %S\n", pusd->bString));
-// // 		}
-// 
-// // 		size = pucd->wTotalLength;
-// // 		ExFreePoolWithTag(pucd, 'ehom');
-// // 		pucd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
-// // 		UsbBuildGetDescriptorRequest(&urb, 
-// // 			(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
-// // 			USB_CONFIGURATION_DESCRIPTOR_TYPE, 0, 0, pucd, NULL, 
-// // 			size, NULL);
-// // 		status = ufd_CallUSBD(pdo, &urb);
-// 		
-// 	}
-// 
-// 	ExFreePoolWithTag(pudd, 'ehom');
+
 	// 创建设备
 	KdPrint(("usbfilter.sys!!! ufd_add_device enter[%wZ]\n", &DriverObject->DriverName));
 	status = IoCreateDevice(DriverObject, sizeof(device_extension), NULL,
@@ -240,14 +196,14 @@ NTSTATUS ufd_dispatch_pnp(IN PDEVICE_OBJECT device_object, IN PIRP irp)
 		return IoCallDriver(pdx->lower_device_object, irp);
 	}
 
-	if(IRP_MN_START_DEVICE == stack->MinorFunction)
-	{
-		IoCopyCurrentIrpStackLocationToNext(irp);
-		IoSetCompletionRoutine(irp, ufd_completion_start_device,
-			(PVOID)pdx, TRUE, TRUE, TRUE);
-		
-		return IoCallDriver(pdx->lower_device_object, irp);
-	}
+// 	if(IRP_MN_START_DEVICE == stack->MinorFunction)
+// 	{
+// 		IoCopyCurrentIrpStackLocationToNext(irp);
+// 		IoSetCompletionRoutine(irp, ufd_completion_start_device,
+// 			(PVOID)pdx, TRUE, TRUE, TRUE);
+// 		
+// 		return IoCallDriver(pdx->lower_device_object, irp);
+// 	}
 
 	if(IRP_MN_REMOVE_DEVICE == stack->MinorFunction)
 	{
@@ -274,74 +230,67 @@ NTSTATUS ufd_dispatch_pnp_start_device(IN PDEVICE_OBJECT device_object,
 	PDRIVER_OBJECT						pDriver;
 	UNICODE_STRING						usName;
 	device_extension_ptr				pdx;
-	NTSTATUS							status;
-	HANDLE								handle;
-	URB									urb;
-	PUSB_STRING_DESCRIPTOR				pusd;
-	PUSB_DEVICE_DESCRIPTOR				pudd;
-	LONG								size;
+	NTSTATUS							status				= STATUS_SUCCESS;
+	USHORT								vid, pid;
+	PWCHAR								pbuff				= NULL;
+	PWCHAR								pManufacturer		= NULL;
+	PWCHAR								pProduct			= NULL;
+	PWCHAR								pSerialNumber		= NULL;
+	UCHAR								uclass				= 0;
 
 	pdx = (device_extension_ptr)device_object->DeviceExtension;
-	//获取设备信息
-	size = sizeof(USB_DEVICE_DESCRIPTOR);
-	pudd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
-	UsbBuildGetDescriptorRequest(&urb, 
-		(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
-		USB_DEVICE_DESCRIPTOR_TYPE, 0, 0, pudd, NULL, 
-		size, NULL);
- 	status = ufd_CallUSBD(pdx->lower_device_object, &urb);
-	KdPrint(("get urb retrun: %x\n", status));
+	// 获取设备Class
+	status = ufd_get_usb_class(pdx->lower_device_object, &uclass);
+	if( !NT_SUCCESS(status) )
+	{
+		goto ufd_dispatch_pnp_start_device_from_name;
+	}
+	// 验证设备是否放行
+	status = ufd_check_usb_class(uclass);
 	if( NT_SUCCESS(status) )
 	{
-		size = 1024;
-		pusd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
-		pusd->bLength = size;
-		UsbBuildGetDescriptorRequest(&urb, 
-			(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
-			USB_STRING_DESCRIPTOR_TYPE, pudd->iSerialNumber, 936, pusd, NULL, 
-			size, NULL);
-		status = ufd_CallUSBD(pdx->lower_device_object, &urb);
-		KdPrint(("serial number: %S\n", pusd->bString));
-		ExFreePoolWithTag(pusd, 'ehom');
-		// 取设备类型　
-		{
-			PUSB_INTERFACE_DESCRIPTOR		puid;
-			PUSB_CONFIGURATION_DESCRIPTOR	pucd;
-
-			size = sizeof(USB_CONFIGURATION_DESCRIPTOR);
-			pucd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
-			UsbBuildGetDescriptorRequest(&urb, 
-				(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
-				USB_CONFIGURATION_DESCRIPTOR_TYPE, 0, 0, pucd, NULL, 
-				size, NULL);
-			status = ufd_CallUSBD(pdx->lower_device_object, &urb);
-			if( NT_SUCCESS(status) )
-			{
-				size = pucd->wTotalLength;
-				ExFreePoolWithTag(pucd, 'ehom');
-				pucd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
-				UsbBuildGetDescriptorRequest(&urb, 
-					(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
-					USB_CONFIGURATION_DESCRIPTOR_TYPE, 0, 0, pucd, NULL, 
-					size, NULL);
-				status = ufd_CallUSBD(pdx->lower_device_object, &urb);
-				if( NT_SUCCESS(status) )
-				{
-#define INTERFACENUMBER 0  
-#define ALTERNATESETTING 1  
-					puid = USBD_ParseConfigurationDescriptorEx(pucd, pucd, 
-						INTERFACENUMBER,
-						0/*ALTERNATESETTING*/,
-						-1, -1, -1);
-				}
-			}
-			ExFreePoolWithTag(pucd, 'ehom');
-		}
+		return STATUS_SUCCESS;
+	}
+	// 设备是阻止的，　看是否在放行列表
+	// 获取设备信息
+	pbuff = ExAllocatePoolWithTag(NonPagedPool, 64 * 3 * sizeof(WCHAR), 'ehom');
+	if(NULL == pbuff)
+	{
+		goto ufd_dispatch_pnp_start_device_from_name;
+	}
+	
+	pManufacturer = pbuff;
+	pProduct = pManufacturer + 64;
+	pSerialNumber = pProduct + 64;
+	status = ufd_get_usb_info(pdx->lower_device_object, &vid, &pid, pManufacturer, 
+		pProduct, pSerialNumber);
+	if( !NT_SUCCESS(status) )
+	{
+		status = STATUS_UNSUCCESSFUL;
+		goto  ufd_dispatch_pnp_start_device_end;
+	}
+	// 验证是否跳过设备
+	status = ufd_check_usb_skip(vid, pid, pManufacturer, pProduct, pSerialNumber);
+	if( NT_SUCCESS(status) )
+	{
+		status = STATUS_SUCCESS;
+		goto ufd_dispatch_pnp_start_device_end;
+	}
+	else
+	{
+		status = STATUS_UNSUCCESSFUL;
+		goto  ufd_dispatch_pnp_start_device_end;
 	}
 
-	ExFreePoolWithTag(pudd, 'ehom');
-	// 过滤设置
-	pDriver = pdx->lower_device_object->DriverObject;
+ufd_dispatch_pnp_start_device_from_name:
+	// 最后根据驱动文件名称判断
+	if(NULL == device_object->AttachedDevice)
+	{
+		status = STATUS_SUCCESS;
+		goto ufd_dispatch_pnp_start_device_end;
+	}
+
+	pDriver = device_object->AttachedDevice->DriverObject;
 	RtlInitUnicodeString(&usName, L"\\driver\\usbstor");
 	KdPrint(("usbfilter.sys!!! IRP_MN_START_DEVICE: %wZ <=> %wZ\n", 
 		&pDriver->DriverName, &usName));
@@ -355,7 +304,13 @@ NTSTATUS ufd_dispatch_pnp_start_device(IN PDEVICE_OBJECT device_object,
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	return STATUS_SUCCESS;
+ufd_dispatch_pnp_start_device_end:
+	if(NULL != pbuff)
+	{
+		ExFreePoolWithTag(pbuff, 'ehom');
+	}
+
+	return status;
 }
 /*
  *	SCSI例程
@@ -509,7 +464,164 @@ ULONG ufd_get_device_type(PDEVICE_OBJECT pdo)
 
 	return type;
 }
+/*
+ *	获取Ｕ盘信息
+ */
+NTSTATUS ufd_get_usb_info(PDEVICE_OBJECT fdo, USHORT* pvid, USHORT* ppid, 
+						  WCHAR* pmanuf, WCHAR* pproduct, WCHAR* psn)
+{
+	NTSTATUS							status;
+	URB									urb;
+	PUSB_STRING_DESCRIPTOR				pusd			= NULL;
+	PUSB_DEVICE_DESCRIPTOR				pudd			= NULL;
+	LONG								size;
 
+	//获取设备信息
+	size = sizeof(USB_DEVICE_DESCRIPTOR);
+	pudd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
+	UsbBuildGetDescriptorRequest(&urb, 
+		(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+		USB_DEVICE_DESCRIPTOR_TYPE, 0, 0, pudd, NULL, 
+		size, NULL);
+	status = ufd_CallUSBD(fdo, &urb);
+	if( !NT_SUCCESS(status) )
+	{
+		KdPrint(("ufd_get_usb_info get USB_DEVICE_DESCRIPTOR_TYPE failed: 0x%x",
+			status));
+		goto ufd_get_usb_info_end;
+	}
+
+	*pvid = pudd->idVendor;
+	*ppid = pudd->idProduct;
+	// 获取生产厂家字符串
+	size = 128;
+	pusd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
+	RtlZeroMemory(pusd, size);
+	UsbBuildGetDescriptorRequest(&urb, 
+		(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+		USB_STRING_DESCRIPTOR_TYPE, pudd->iManufacturer, 936, pusd, NULL, 
+		size, NULL);
+	status = ufd_CallUSBD(fdo, &urb);
+	if( NT_SUCCESS(status) )
+	{
+		wcsncpy(pmanuf, pusd->bString, min(wcslen(pusd->bString), 63));
+	}
+	// 获取产品字符串
+	RtlZeroMemory(pusd, size);
+	UsbBuildGetDescriptorRequest(&urb, 
+		(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+		USB_STRING_DESCRIPTOR_TYPE, pudd->iProduct, 936, pusd, NULL, 
+		size, NULL);
+	status = ufd_CallUSBD(fdo, &urb);
+	if( NT_SUCCESS(status) )
+	{
+		wcsncpy(pproduct, pusd->bString, min(wcslen(pusd->bString), 63));
+	}
+	// 获取序列号符串
+	RtlZeroMemory(pusd, size);
+	UsbBuildGetDescriptorRequest(&urb, 
+		(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+		USB_STRING_DESCRIPTOR_TYPE, pudd->iSerialNumber, 936, pusd, NULL, 
+		size, NULL);
+	status = ufd_CallUSBD(fdo, &urb);
+	if( NT_SUCCESS(status) )
+	{
+		wcsncpy(psn, pusd->bString, min(wcslen(pusd->bString), 63));
+	}
+	
+ufd_get_usb_info_end:
+	if(NULL != pudd)
+	{
+		ExFreePoolWithTag(pudd, 'ehom');
+	}
+	if(NULL != pusd)
+	{
+		ExFreePoolWithTag(pusd, 'ehom');
+	}
+
+	return status;
+}
+/*
+ *	获取USB设备的类名
+ */
+NTSTATUS ufd_get_usb_class(PDEVICE_OBJECT fdo, UCHAR* pclass)
+{
+	NTSTATUS							status			= STATUS_SUCCESS;
+	URB									urb;
+	PUSB_INTERFACE_DESCRIPTOR			puid			= NULL;
+	PUSB_CONFIGURATION_DESCRIPTOR		pucd			= NULL;
+	LONG								size;
+
+	size = sizeof(USB_CONFIGURATION_DESCRIPTOR);
+	pucd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
+	UsbBuildGetDescriptorRequest(&urb, 
+		(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+		USB_CONFIGURATION_DESCRIPTOR_TYPE, 0, 0, pucd, NULL, 
+		size, NULL);
+	status = ufd_CallUSBD(fdo, &urb);
+	if( !NT_SUCCESS(status) )
+	{
+		goto ufd_get_usb_class;
+	}
+
+	size = pucd->wTotalLength;
+	ExFreePoolWithTag(pucd, 'ehom');
+	pucd = ExAllocatePoolWithTag(NonPagedPool, size, 'ehom');
+	UsbBuildGetDescriptorRequest(&urb, 
+		(USHORT)sizeof(struct _URB_CONTROL_DESCRIPTOR_REQUEST),
+		USB_CONFIGURATION_DESCRIPTOR_TYPE, 0, 0, pucd, NULL, 
+		size, NULL);
+	status = ufd_CallUSBD(fdo, &urb);
+	if( !NT_SUCCESS(status) )
+	{
+		goto ufd_get_usb_class;
+	}
+
+#define INTERFACENUMBER 0  
+#define ALTERNATESETTING 1  
+	puid = USBD_ParseConfigurationDescriptorEx(pucd, pucd, 
+		INTERFACENUMBER,
+		0/*ALTERNATESETTING*/,
+		-1, -1, -1);
+	if(NULL == puid)
+	{
+		status = STATUS_UNSUCCESSFUL;
+		goto ufd_get_usb_class;
+	}
+
+	*pclass = puid->bInterfaceClass;
+ufd_get_usb_class:
+	if(NULL != pucd)
+	{
+		ExFreePoolWithTag(pucd, 'ehom');
+	}
+
+	return status;
+}
+/*
+ *	检查设备类型
+ */
+NTSTATUS ufd_check_usb_class(UCHAR uclass)
+{
+	if(USB_DEVICE_CLASS_STORAGE == uclass 
+		|| USB_DEVICE_CLASS_PRINTER == uclass)
+	{
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	return STATUS_SUCCESS;
+}
+/*
+ *	查看设备是否跳过的设备
+ */
+NTSTATUS ufd_check_usb_skip(USHORT vid, USHORT pid, WCHAR* pmanuf, 
+							WCHAR* pproduct, WCHAR* psn)
+{
+	return STATUS_UNSUCCESSFUL;
+}
+/*
+ *	调用usb驱动
+ */
 NTSTATUS ufd_CallUSBD(IN PDEVICE_OBJECT fdo, IN PURB Urb)
 {  
    NTSTATUS					ntStatus, status = STATUS_SUCCESS;  
