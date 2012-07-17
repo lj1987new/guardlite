@@ -20,13 +20,17 @@ NTSTATUS	ufd_dispatch_pnp(IN PDEVICE_OBJECT device_object, IN PIRP irp);
 NTSTATUS	ufd_dispatch_pnp_start_device(IN PDEVICE_OBJECT device_object, 
 										  IN PIRP irp);
 NTSTATUS	ufd_dispatch_scsi(IN PDEVICE_OBJECT device_object, IN PIRP irp);
+NTSTATUS	ufd_dispatch_internal_device_control(IN PDEVICE_OBJECT device_object, 
+												 IN PIRP irp);
 
 NTSTATUS	ufd_completion_usage_notification(IN PDEVICE_OBJECT device_object, 
 											  IN PIRP irp, IN PVOID Context);
 NTSTATUS	ufd_completion_start_device(IN PDEVICE_OBJECT device_object, 
 										IN PIRP irp, IN PVOID Context);
 NTSTATUS	ufd_completion_scsi(IN PDEVICE_OBJECT device_object, 
-										IN PIRP irp, IN PVOID Context);
+								IN PIRP irp, IN PVOID Context);
+NTSTATUS	ufd_completion_internal_device_control(IN PDEVICE_OBJECT device_object, 
+								IN PIRP irp, IN PVOID Context);
 
 NTSTATUS	ufd_get_usb_info(PDEVICE_OBJECT fdo, USHORT* pvid, USHORT* ppid, 
 							 WCHAR* pmanuf, WCHAR* pproduct, WCHAR* psn);

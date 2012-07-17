@@ -23,6 +23,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT pDriverObj, PUNICODE_STRING pRegistryString)
 
 	pDriverObj->MajorFunction[IRP_MJ_POWER] = ufd_dispatch_power;
 	pDriverObj->MajorFunction[IRP_MJ_PNP] = ufd_dispatch_pnp;
+	pDriverObj->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL] = ufd_dispatch_internal_device_control;
 //	pDriverObj->MajorFunction[IRP_MJ_SCSI] = ufd_dispatch_scsi;
 
 	return STATUS_SUCCESS;
@@ -173,7 +174,7 @@ NTSTATUS ufd_dispatch_pnp(IN PDEVICE_OBJECT device_object, IN PIRP irp)
 
 	if(IRP_MN_START_DEVICE == stack->MinorFunction)
 	{
-		status = ufd_dispatch_pnp_start_device(device_object, irp);
+		//status = ufd_dispatch_pnp_start_device(device_object, irp);
 		if( !NT_SUCCESS(status) )
 		{
 			IoReleaseRemoveLock(&pdx->remove_lock, irp);
@@ -342,6 +343,111 @@ NTSTATUS ufd_dispatch_scsi(IN PDEVICE_OBJECT device_object, IN PIRP irp)
 	return status;
 }
 /*
+ *	
+ */
+NTSTATUS ufd_dispatch_internal_device_control(IN PDEVICE_OBJECT device_object, 
+											  IN PIRP irp)
+{
+	device_extension_ptr			pdx;
+	PIO_STACK_LOCATION				stack;
+	NTSTATUS						status;
+	PURB							purb;
+
+	pdx = (device_extension_ptr)device_object->DeviceExtension;
+	stack = IoGetCurrentIrpStackLocation(irp);
+
+	status = IoAcquireRemoveLock(&pdx->remove_lock, irp);
+	if( !NT_SUCCESS(status) )
+	{
+		irp->IoStatus.Information = 0;
+		irp->IoStatus.Status = status;
+		IoCompleteRequest(irp, IO_NO_INCREMENT);
+		return status;
+	}
+
+	if( IOCTL_INTERNAL_USB_SUBMIT_URB == stack->Parameters.DeviceIoControl.IoControlCode
+		&& NULL != (purb = (PURB)stack->Parameters.Others.Argument1))
+	{
+// 		KdPrint(("usbfilter.sys!!! device_control (code)%d: \n", 
+// 			purb->UrbHeader.Function));
+		if(URB_FUNCTION_BULK_OR_INTERRUPT_TRANSFER == purb->UrbHeader.Function)
+		{
+			if(0x1F == purb->UrbBulkOrInterruptTransfer.TransferBufferLength)
+			{
+				char*		pBuf		= NULL;
+				
+				if(NULL != purb->UrbBulkOrInterruptTransfer.TransferBuffer)
+				{
+					pBuf = purb->UrbBulkOrInterruptTransfer.TransferBuffer;
+				}
+				else
+				{
+					pBuf = MmGetMdlVirtualAddress(purb->UrbBulkOrInterruptTransfer.TransferBufferMDL);
+				}
+
+				// CBW结构体
+				if(NULL != pBuf)
+				{
+// 					KdPrint(("usbfilter.sys!!! device_control (flag)%x \n", 
+// 						purb->UrbBulkOrInterruptTransfer.TransferFlags));
+					switch(pBuf[0xf])
+					{
+					case 0:
+						break;
+					default:
+						KdPrint(("usbfilter.sys!!! sig(%c%c%c%c) tag(%X) opt(0x%x)\n",
+							pBuf[0], pBuf[1], pBuf[2], pBuf[3],
+							*((ULONG *)&pBuf[4]),
+							(LONG)pBuf[0xf]
+						));
+						break;
+					};
+					
+
+					if(SCSIOP_WRITE == pBuf[0xf])
+					{
+// 						pBuf[0xf] = SCSIOP_READ;
+// 						pBuf[0xc] = 0x80;
+						status = STATUS_MEDIA_WRITE_PROTECTED;
+						irp->IoStatus.Status = status;
+						irp->IoStatus.Information = 0;
+						IoCompleteRequest(irp, IO_NO_INCREMENT);
+						IoReleaseRemoveLock(&pdx->remove_lock, irp);
+						return status;
+					}
+
+					if(/*SCSIOP_MODE_SENSE10 == pBuf[0xf]*/
+					/*||*/ SCSIOP_MODE_SENSE == pBuf[0xf])
+					{
+						int			i;
+						for(i = 0; i < 31; i++)
+							KdPrint(("%x-", pBuf[i]));
+						KdPrint(("\n"));
+						IoCopyCurrentIrpStackLocationToNext(irp);
+						IoSetCompletionRoutine(irp, ufd_completion_internal_device_control,
+							(PVOID)pdx, TRUE, TRUE, TRUE);
+						
+						return IoCallDriver(pdx->lower_device_object, irp);
+					}
+				}
+			}
+			
+// 			status = STATUS_UNSUCCESSFUL;
+// 			irp->IoStatus.Status = status;
+// 			irp->IoStatus.Information = 0;
+// 			IoCompleteRequest(irp, IO_NO_INCREMENT);
+// 			IoReleaseRemoveLock(&pdx->remove_lock, irp);
+// 			return status;
+		}
+	}
+
+	IoSkipCurrentIrpStackLocation(irp);
+	status = IoCallDriver(pdx->lower_device_object, irp);
+	IoReleaseRemoveLock(&pdx->remove_lock, irp);
+
+	return status;
+}
+/*
  *	IRP_MN_DEVICE_USAGE_NOTIFICATION
  */
 NTSTATUS ufd_completion_usage_notification(IN PDEVICE_OBJECT device_object,
@@ -419,6 +525,63 @@ NTSTATUS ufd_completion_scsi(IN PDEVICE_OBJECT device_object,
 		mode = (PMODE_PARAMETER_HEADER)srb->DataBuffer;
 		mode->DeviceSpecificParameter |= MODE_DSP_WRITE_PROTECT;
 	}
+
+	if(irp->PendingReturned)
+	{
+		IoMarkIrpPending(irp);
+	}
+
+	IoReleaseRemoveLock(&pdx->remove_lock, irp);
+
+	return irp->IoStatus.Status;
+}
+
+NTSTATUS ufd_completion_internal_device_control(IN PDEVICE_OBJECT device_object, 
+											IN PIRP irp, IN PVOID Context)
+{
+	device_extension_ptr		pdx;
+	PIO_STACK_LOCATION			stack;
+	PURB						purb;
+	char*						pBuf;
+	PMODE_PARAMETER_HEADER		mode;
+
+	pdx = (device_extension_ptr)device_object->DeviceExtension;
+	stack = IoGetCurrentIrpStackLocation(irp);
+
+	purb = (PURB)stack->Parameters.Others.Argument1;
+	
+	if(purb->UrbBulkOrInterruptTransfer.TransferBuffer)
+	{
+		pBuf = purb->UrbBulkOrInterruptTransfer.TransferBuffer;
+	}
+	else
+	{
+		pBuf = MmGetMdlVirtualAddress(purb->UrbBulkOrInterruptTransfer.TransferBufferMDL);
+	}
+
+	KdPrint(("[%x]usbfilter.sys!!! ufd_completion_internal_device_control sig(%c%c%c%c) %x-%x-%x-%x--%x-%x \n", 
+		irp->IoStatus.Status,
+		pBuf[0], pBuf[1], pBuf[2], pBuf[3],
+		pBuf[12], pBuf[13], pBuf[14], pBuf[15], pBuf[12+7], pBuf[12+8]
+		));
+	{
+		int			i;
+		for(i = 0; i < 31; i++)
+			KdPrint(("%x-", pBuf[i]));
+		KdPrint(("\n"));
+	}
+	mode = (PMODE_PARAMETER_HEADER)&pBuf[12];
+	
+// 	if('USBW' 
+// 		&& srb->DataTransferLength >= sizeof(MODE_PARAMETER_HEADER))
+// 	{
+// 		PMODE_PARAMETER_HEADER		mode;
+// 
+// 		KdPrint(("usbfilter.sys!!! read only!\n"));
+// 		// U盘只读
+// 		mode = (PMODE_PARAMETER_HEADER)srb->DataBuffer;
+// 		mode->DeviceSpecificParameter |= MODE_DSP_WRITE_PROTECT;
+// 	}
 
 	if(irp->PendingReturned)
 	{
